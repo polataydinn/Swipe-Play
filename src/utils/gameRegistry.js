@@ -43,6 +43,7 @@ import GoldMiner from '../games/GoldMiner';
 import DinosaurGame from '../games/DinosaurGame';
 import BallDodge from '../games/BallDodge';
 import BikeJump from '../games/BikeJump';
+import PacmanGame from '../games/PacmanGame';
 
 export const GAME_COMPONENTS = {
   'color-memory': ColorMemory,
@@ -90,4 +91,5 @@ export const GAME_COMPONENTS = {
   'dinosaur-game': DinosaurGame,
   'ball-dodge': BallDodge,
   'bike-jump': BikeJump,
+  'pacman-game': PacmanGame,
 };

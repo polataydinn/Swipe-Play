@@ -148,6 +148,7 @@ const GAME_ICONS = {
   'dinosaur-game': '🦕',
   'ball-dodge': '💨',
   'bike-jump': '🚴',
+  'pacman-game': '👻',
 };
 
 export default function GameListScreen({ onSelectGame }) {

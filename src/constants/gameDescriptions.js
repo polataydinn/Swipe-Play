@@ -70,4 +70,5 @@ export const GAME_DESCRIPTIONS = [
 
   { id: 'ball-dodge', title: 'Top Kaçış', shortDesc: 'Düşen toplardan kaçın!', fullDesc: 'Sağa sola hareket ederek yukarıdan düşen toplardan kaçın. Hayatta kaldıkça puan kazan!', accent: '#f97316', singleLevel: true },
   { id: 'bike-jump', title: 'Bisikletçi', shortDesc: 'Engelleri atlayarak ilerle!', fullDesc: 'Dokunarak zıpla, çift zıplama yaparak engelleri ve uçan kuşları aş!', accent: '#22c55e', singleLevel: true },
+  { id: 'pacman-game', title: 'Pac-Man', shortDesc: 'Noktaları ye, hayaletlerden kaç!', fullDesc: 'Labirenti gezerek tüm noktaları ye. Güç hapı yutunca hayaletleri yiyebilirsin!', accent: '#f7e030', singleLevel: true },
 ];
