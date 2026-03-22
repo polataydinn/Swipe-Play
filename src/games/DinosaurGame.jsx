@@ -122,6 +122,7 @@ export default function DinosaurGame({ difficulty, onCorrect, onWrong, onLockSwi
         s.phase = 'win';
         setPhase('win');
         stopAll();
+        if (onUnlockSwipe) onUnlockSwipe();
         playCorrect();
         onCorrect();
       }
@@ -209,6 +210,7 @@ export default function DinosaurGame({ difficulty, onCorrect, onWrong, onLockSwi
       if (cR > oL && cL < oR && cB > oT && cT < oB) {
         s.phase = 'dead';
         stopAll();
+        if (onUnlockSwipe) onUnlockSwipe();
         setPhase('dead');
         setRs({ charY: s.charY, obstacles: [...s.obstacles], fruits: [...s.fruits], score: s.score, timeLeft: s.timeLeft, jumpsLeft: 0 });
         playWrong();
@@ -269,8 +271,9 @@ export default function DinosaurGame({ difficulty, onCorrect, onWrong, onLockSwi
         {/* Background – static, covers full area */}
         <Image source={BG_IMG} style={styles.bgImage} />
 
-        {/* Ground tint */}
-        <View style={[styles.groundFloor, { top: GROUND_Y }]} />
+        {/* Ground – grass top + soil body */}
+        <View style={[styles.groundGrass, { top: GROUND_Y - 5 }]} />
+        <View style={[styles.groundSoil,  { top: GROUND_Y + 1 }]} />
 
         {/* Obstacles */}
         {(state.obstacles || []).map(o => (
@@ -408,11 +411,19 @@ const styles = StyleSheet.create({
     height: GAME_H,
     resizeMode: 'cover',
   },
-  groundFloor: {
+  groundGrass: {
+    position: 'absolute',
+    left: 0, right: 0,
+    height: 7,
+    backgroundColor: 'rgba(30,140,30,0.75)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(10,100,10,0.9)',
+  },
+  groundSoil: {
     position: 'absolute',
     left: 0, right: 0,
     height: GAME_H,
-    backgroundColor: 'rgba(0,0,0,0.04)',
+    backgroundColor: 'rgba(90,55,20,0.55)',
   },
   charWrap: {
     position: 'absolute',

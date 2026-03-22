@@ -1,69 +1,97 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Dimensions, Image } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { playTap, playCorrect, playWrong } from '../utils/sounds';
+
+const FUFU_IMG    = require('../assets/dino/fufu.png');
+const BG_IMG      = require('../assets/dino/BG.png');
+const OBJECTS_IMG = require('../assets/dino/objects.png');
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const GAME_W = Math.min(SW - 16, 360);
 const GAME_H = Math.min(SH * 0.68, 520);
-const PLAYER_W = 40;
-const PLAYER_H = 40;
-const BALL_RADIUS = 16;
-const BALL_EMOJIS = ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣'];
+
+// ── Fufu sprite (828×140, 4 frames of 207px) ──
+const FUFU_SHEET_W = 828;
+const FUFU_SHEET_H = 140;
+const FUFU_FRAME_W = 207;
+const FUFU_SCALE   = 0.30;
+const CHAR_W = FUFU_FRAME_W * FUFU_SCALE;
+const CHAR_H = FUFU_SHEET_H * FUFU_SCALE;
+const FRAME_IDLE  = 0;
+const FRAME_WALK1 = 1;
+const FRAME_WALK2 = 2;
+
+// ── Objects atlas (776×309) ──
+const OBJ_W = 776;
+const OBJ_H = 309;
+
+// Falling item definitions – small objects from atlas
+const FALLING_ITEMS = [
+  { x: 739, y: 139, w: 30, h: 35, s: 1.1 },  // fruit
+  { x: 688, y: 132, w: 49, h: 41, s: 0.85 }, // mushroom_1
+  { x: 724, y:  30, w: 50, h: 41, s: 0.85 }, // mushroom_2
+  { x: 649, y:  24, w: 73, h: 47, s: 0.60 }, // bush_3
+  { x: 649, y:  73, w: 90, h: 54, s: 0.50 }, // stone
+];
+
+const PLAYER_Y_OFFSET = 60; // from bottom of game area
+const PLAYER_Y = GAME_H - PLAYER_Y_OFFSET - CHAR_H;
 
 const DIFFICULTY_CONFIG = {
-  0: { duration: 30, spawnMs: 1800, ballSpeed: 3, maxBalls: 6, playerSpeed: 5 },
-  1: { duration: 30, spawnMs: 1200, ballSpeed: 4, maxBalls: 9, playerSpeed: 6 },
-  2: { duration: 25, spawnMs: 800,  ballSpeed: 5.5, maxBalls: 12, playerSpeed: 7 },
+  0: { duration: 30, spawnMs: 1800, fallSpd: 3,   maxItems: 6,  playerSpd: 5 },
+  1: { duration: 30, spawnMs: 1200, fallSpd: 4.2,  maxItems: 9,  playerSpd: 6 },
+  2: { duration: 25, spawnMs: 800,  fallSpd: 5.8,  maxItems: 12, playerSpd: 7 },
 };
 
 export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe, onUnlockSwipe }) {
-  const config = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG[0];
+  const cfg = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG[0];
 
-  const [phase, setPhase] = useState('ready');
-  const [renderState, setRenderState] = useState(null);
+  const [phase,     setPhase]     = useState('ready');
+  const [rs,        setRs]        = useState(null);
+  const [animFrame, setAnimFrame] = useState(FRAME_IDLE);
 
-  const stRef = useRef(null);
-  const frameRef = useRef(null);
-  const spawnTimerRef = useRef(null);
-  const countTimerRef = useRef(null);
-  const isMountedRef = useRef(true);
+  const stRef    = useRef(null);
+  const rafRef   = useRef(null);
+  const spawnRef = useRef(null);
+  const countRef = useRef(null);
+  const animRef  = useRef(null);
+  const mounted  = useRef(true);
 
-  const PLAYER_Y = GAME_H - 60;
-
-  const initState = () => ({
-    phase: 'ready',
-    playerX: GAME_W / 2 - PLAYER_W / 2,
-    balls: [],
-    timeLeft: config.duration,
-    moveDir: 0,
-    nextBallId: 0,
+  const fresh = () => ({
+    playerX:   GAME_W / 2 - CHAR_W / 2,
+    items:     [],
+    timeLeft:  cfg.duration,
+    moveDir:   0,
+    nextId:    0,
+    phase:     'ready',
   });
 
   useEffect(() => {
-    stRef.current = initState();
-    setRenderState({ ...stRef.current });
-    if (onLockSwipe) onLockSwipe();
+    stRef.current = fresh();
+    setRs({ ...stRef.current });
     return () => {
-      isMountedRef.current = false;
-      if (frameRef.current) cancelAnimationFrame(frameRef.current);
-      if (spawnTimerRef.current) clearInterval(spawnTimerRef.current);
-      if (countTimerRef.current) clearInterval(countTimerRef.current);
+      mounted.current = false;
+      stopAll();
       if (onUnlockSwipe) onUnlockSwipe();
     };
   }, []);
 
-  useEffect(() => {
-    resetGame();
-  }, [difficulty]);
+  useEffect(() => { resetGame(); }, [difficulty]);
+
+  const stopAll = () => {
+    if (rafRef.current)   cancelAnimationFrame(rafRef.current);
+    if (spawnRef.current)  clearInterval(spawnRef.current);
+    if (countRef.current)  clearInterval(countRef.current);
+    if (animRef.current)   clearInterval(animRef.current);
+  };
 
   const resetGame = () => {
-    if (frameRef.current) cancelAnimationFrame(frameRef.current);
-    if (spawnTimerRef.current) clearInterval(spawnTimerRef.current);
-    if (countTimerRef.current) clearInterval(countTimerRef.current);
-    stRef.current = initState();
+    stopAll();
+    stRef.current = fresh();
     setPhase('ready');
-    setRenderState({ ...stRef.current });
+    setAnimFrame(FRAME_IDLE);
+    setRs({ ...stRef.current });
   };
 
   const startGame = () => {
@@ -71,136 +99,152 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
     stRef.current.phase = 'play';
     setPhase('play');
 
-    // Countdown
-    countTimerRef.current = setInterval(() => {
-      if (!isMountedRef.current) return;
+    countRef.current = setInterval(() => {
+      if (!mounted.current) return;
       const s = stRef.current;
       if (s.phase !== 'play') return;
       s.timeLeft -= 1;
       if (s.timeLeft <= 0) {
         s.timeLeft = 0;
         s.phase = 'win';
+        stopAll();
+        if (onUnlockSwipe) onUnlockSwipe();
         setPhase('win');
-        clearInterval(countTimerRef.current);
-        clearInterval(spawnTimerRef.current);
         playCorrect();
         onCorrect();
       }
     }, 1000);
 
-    // Ball spawner
-    spawnTimerRef.current = setInterval(() => {
-      if (!isMountedRef.current) return;
+    spawnRef.current = setInterval(() => {
+      if (!mounted.current) return;
+      const s = stRef.current;
+      if (s.phase !== 'play' || s.items.length >= cfg.maxItems) return;
+      const tmpl = FALLING_ITEMS[Math.floor(Math.random() * FALLING_ITEMS.length)];
+      s.items.push({
+        id: s.nextId++,
+        x: tmpl.w * tmpl.s / 2 + Math.random() * (GAME_W - tmpl.w * tmpl.s),
+        y: -tmpl.h * tmpl.s,
+        vy: cfg.fallSpd + Math.random() * 1.5,
+        vx: (Math.random() - 0.5) * 2.5,
+        frame: tmpl,
+      });
+    }, cfg.spawnMs);
+
+    // walk animation when moving
+    let wStep = FRAME_WALK1;
+    animRef.current = setInterval(() => {
+      if (!mounted.current) return;
       const s = stRef.current;
       if (s.phase !== 'play') return;
-      if (s.balls.length >= config.maxBalls) return;
-      const id = s.nextBallId++;
-      s.balls.push({
-        id,
-        x: BALL_RADIUS + Math.random() * (GAME_W - BALL_RADIUS * 2),
-        y: -BALL_RADIUS,
-        vy: config.ballSpeed + Math.random() * 1.5,
-        vx: (Math.random() - 0.5) * 2.5,
-        emoji: BALL_EMOJIS[Math.floor(Math.random() * BALL_EMOJIS.length)],
-      });
-    }, config.spawnMs);
+      if (s.moveDir !== 0) {
+        wStep = wStep === FRAME_WALK1 ? FRAME_WALK2 : FRAME_WALK1;
+        setAnimFrame(wStep);
+      } else {
+        setAnimFrame(FRAME_IDLE);
+      }
+    }, 130);
 
-    frameRef.current = requestAnimationFrame(gameLoop);
+    rafRef.current = requestAnimationFrame(loop);
   };
 
-  const gameLoop = () => {
-    if (!isMountedRef.current) return;
+  const loop = () => {
+    if (!mounted.current) return;
     const s = stRef.current;
     if (s.phase !== 'play') return;
 
-    // Move player
-    s.playerX += s.moveDir * config.playerSpeed;
-    s.playerX = Math.max(0, Math.min(GAME_W - PLAYER_W, s.playerX));
+    // move player
+    s.playerX += s.moveDir * cfg.playerSpd;
+    s.playerX = Math.max(0, Math.min(GAME_W - CHAR_W, s.playerX));
 
-    // Move balls
-    for (const b of s.balls) {
-      b.vy += 0.15; // gravity
-      b.x += b.vx;
-      b.y += b.vy;
-      // Bounce off walls
-      if (b.x - BALL_RADIUS < 0) { b.x = BALL_RADIUS; b.vx = Math.abs(b.vx); }
-      if (b.x + BALL_RADIUS > GAME_W) { b.x = GAME_W - BALL_RADIUS; b.vx = -Math.abs(b.vx); }
+    // update items
+    for (const it of s.items) {
+      it.vy += 0.15;
+      it.x  += it.vx;
+      it.y  += it.vy;
+      if (it.x < 0)            { it.x = 0;                  it.vx =  Math.abs(it.vx); }
+      if (it.x > GAME_W - it.frame.w * it.frame.s)
+                                { it.x = GAME_W - it.frame.w * it.frame.s; it.vx = -Math.abs(it.vx); }
     }
+    s.items = s.items.filter(it => it.y < GAME_H + 40);
 
-    // Remove balls that fell off bottom
-    s.balls = s.balls.filter(b => b.y - BALL_RADIUS < GAME_H + 20);
+    // collision
+    const mg = 8;
+    const pL = s.playerX + mg;
+    const pR = s.playerX + CHAR_W - mg;
+    const pT = PLAYER_Y + mg;
+    const pB = PLAYER_Y + CHAR_H - mg;
 
-    // Collision: player center vs ball center
-    const playerCX = s.playerX + PLAYER_W / 2;
-    const playerCY = PLAYER_Y + PLAYER_H / 2;
-    for (const b of s.balls) {
-      const dist = Math.sqrt((playerCX - b.x) ** 2 + (playerCY - b.y) ** 2);
-      if (dist < BALL_RADIUS + 20) {
+    for (const it of s.items) {
+      const iW = it.frame.w * it.frame.s;
+      const iH = it.frame.h * it.frame.s;
+      if (pR > it.x + mg && pL < it.x + iW - mg &&
+          pB > it.y + mg && pT < it.y + iH - mg) {
         s.phase = 'dead';
-        clearInterval(spawnTimerRef.current);
-        clearInterval(countTimerRef.current);
+        stopAll();
+        if (onUnlockSwipe) onUnlockSwipe();
         setPhase('dead');
-        setRenderState({ playerX: s.playerX, balls: [...s.balls], timeLeft: s.timeLeft, phase: 'dead' });
+        setRs({ playerX: s.playerX, items: [...s.items], timeLeft: s.timeLeft });
         playWrong();
         onWrong();
         return;
       }
     }
 
-    setRenderState({
-      playerX: s.playerX,
-      balls: [...s.balls],
-      timeLeft: s.timeLeft,
-      phase: s.phase,
-    });
-
-    frameRef.current = requestAnimationFrame(gameLoop);
+    setRs({ playerX: s.playerX, items: [...s.items], timeLeft: s.timeLeft });
+    rafRef.current = requestAnimationFrame(loop);
   };
-
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-      if (frameRef.current) cancelAnimationFrame(frameRef.current);
-      if (spawnTimerRef.current) clearInterval(spawnTimerRef.current);
-      if (countTimerRef.current) clearInterval(countTimerRef.current);
-    };
-  }, []);
 
   const setMoveDir = (dir) => {
-    if (stRef.current && stRef.current.phase === 'play') {
-      stRef.current.moveDir = dir;
-    }
+    if (stRef.current?.phase === 'play') stRef.current.moveDir = dir;
   };
 
-  const rs = renderState || initState();
+  const state = rs || fresh();
+  const facingLeft = stRef.current?.moveDir === -1;
 
   return (
-    <View style={styles.container}>
+    <View style={styles.root}>
       <Text style={styles.title}>Top Kaçış</Text>
-      <Text style={styles.sub}>Süre: {Math.ceil(rs.timeLeft || config.duration)}s</Text>
+      <Text style={styles.sub}>Süre: {Math.ceil(state.timeLeft ?? cfg.duration)}s</Text>
 
-      <View style={styles.gameArea}>
-        {/* Balls */}
-        {(rs.balls || []).map(b => (
-          <Text
-            key={b.id}
-            style={[styles.ballEmoji, {
-              left: b.x - BALL_RADIUS,
-              top: b.y - BALL_RADIUS,
-            }]}
-          >
-            {b.emoji}
-          </Text>
+      <View style={styles.arena}>
+        {/* Background */}
+        <Image source={BG_IMG} style={styles.bgImg} />
+
+        {/* Ground strip */}
+        <View style={styles.groundGrass} />
+        <View style={styles.groundSoil}  />
+
+        {/* Falling items */}
+        {(state.items || []).map(it => (
+          <AtlasSprite
+            key={it.id}
+            source={OBJECTS_IMG}
+            frame={it.frame}
+            sw={OBJ_W} sh={OBJ_H}
+            scale={it.frame.s}
+            x={it.x} y={it.y}
+          />
         ))}
 
-        {/* Player */}
-        <Text style={[styles.playerEmoji, {
-          left: rs.playerX,
-          top: PLAYER_Y,
-          transform: [{ scaleX: -1 }],
-        }]}>🏃</Text>
+        {/* Player – Fufu */}
+        <View style={[styles.charWrap, {
+          left:      state.playerX,
+          top:       PLAYER_Y,
+          width:     CHAR_W,
+          height:    CHAR_H,
+          transform: [{ scaleX: facingLeft ? -1 : 1 }],
+        }]}>
+          <Image
+            source={FUFU_IMG}
+            style={{
+              width:  FUFU_SHEET_W * FUFU_SCALE,
+              height: FUFU_SHEET_H * FUFU_SCALE,
+              transform: [{ translateX: -animFrame * FUFU_FRAME_W * FUFU_SCALE }],
+            }}
+          />
+        </View>
 
-        {/* Touch zones - left and right halves, shown only in play */}
+        {/* Touch zones */}
         {phase === 'play' && (
           <>
             <TouchableOpacity
@@ -222,121 +266,108 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
           </>
         )}
 
-        {/* Overlays */}
         {phase === 'ready' && (
-          <View style={styles.overlay}>
-            <Text style={styles.overlayTitle}>Top Kaçış</Text>
-            <Text style={styles.overlayDesc}>Sol/Sağ'a basılı tut{'\n'}toplardan kaç!</Text>
-            <TouchableOpacity style={styles.startBtn} onPress={startGame}>
-              <Text style={styles.startBtnText}>BAŞLA</Text>
+          <Overlay>
+            <Text style={styles.ovTitle}>Top Kaçış</Text>
+            <Text style={styles.ovDesc}>Sol/Sağ'a basılı tut{'\n'}nesnelerden kaç!</Text>
+            <TouchableOpacity style={[styles.btn, { backgroundColor: '#f97316' }]} onPress={startGame}>
+              <Text style={styles.btnTxt}>BAŞLA</Text>
             </TouchableOpacity>
-          </View>
+          </Overlay>
         )}
         {phase === 'win' && (
-          <View style={styles.overlay}>
-            <Text style={styles.overlayTitle}>Harika! 🎉</Text>
-            <Text style={styles.overlayDesc}>Hayatta kaldın!</Text>
-            <TouchableOpacity style={styles.startBtn} onPress={resetGame}>
-              <Text style={styles.startBtnText}>TEKRAR</Text>
+          <Overlay>
+            <Text style={styles.ovTitle}>Harika! 🎉</Text>
+            <Text style={styles.ovDesc}>Hayatta kaldın!</Text>
+            <TouchableOpacity style={[styles.btn, { backgroundColor: '#22c55e' }]} onPress={resetGame}>
+              <Text style={styles.btnTxt}>TEKRAR</Text>
             </TouchableOpacity>
-          </View>
+          </Overlay>
         )}
         {phase === 'dead' && (
-          <View style={styles.overlay}>
-            <Text style={styles.overlayTitle}>Çarpıştı! 💥</Text>
-            <Text style={styles.overlayDesc}>Kalan süre: {Math.ceil(rs.timeLeft)}s</Text>
-            <TouchableOpacity style={styles.startBtn} onPress={resetGame}>
-              <Text style={styles.startBtnText}>TEKRAR</Text>
+          <Overlay>
+            <Text style={styles.ovTitle}>Çarpıştı! 💥</Text>
+            <Text style={styles.ovDesc}>Kalan süre: {Math.ceil(state.timeLeft)}s</Text>
+            <TouchableOpacity style={[styles.btn, { backgroundColor: '#ef4444' }]} onPress={resetGame}>
+              <Text style={styles.btnTxt}>TEKRAR</Text>
             </TouchableOpacity>
-          </View>
+          </Overlay>
         )}
       </View>
     </View>
   );
 }
 
-const PLAYER_Y = Math.min(Dimensions.get('window').height * 0.68, 520) - 60;
+// ── helpers ───────────────────────────────────────────────────────────────────
+function AtlasSprite({ source, frame, sw, sh, scale, x, y }) {
+  return (
+    <View style={{ position: 'absolute', left: x, top: y,
+                   width: frame.w * scale, height: frame.h * scale,
+                   overflow: 'hidden' }}>
+      <Image source={source} style={{
+        width: sw * scale, height: sh * scale,
+        transform: [{ translateX: -frame.x * scale }, { translateY: -frame.y * scale }],
+      }} />
+    </View>
+  );
+}
+
+function Overlay({ children }) {
+  return <View style={styles.overlay}>{children}</View>;
+}
+
+// ── styles ────────────────────────────────────────────────────────────────────
+const GROUND_Y_POS = GAME_H - 56;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 8,
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    margin: 8,
+  root: {
+    flex: 1, justifyContent: 'center', alignItems: 'center',
+    padding: 8, backgroundColor: COLORS.surface, borderRadius: 20, margin: 8,
   },
   title: { color: COLORS.text, fontSize: 22, fontWeight: '900', marginBottom: 2 },
-  sub: { color: COLORS.textSecondary, fontSize: 13, marginBottom: 8 },
-  gameArea: {
-    width: GAME_W,
-    height: GAME_H,
-    backgroundColor: '#0a0a1a',
-    borderRadius: 12,
-    overflow: 'hidden',
-    position: 'relative',
+  sub:   { color: COLORS.textSecondary, fontSize: 13, marginBottom: 8 },
+  arena: {
+    width: GAME_W, height: GAME_H,
+    borderRadius: 12, overflow: 'hidden', position: 'relative',
+    backgroundColor: '#87ceeb',
   },
-  ballEmoji: {
-    position: 'absolute',
-    fontSize: BALL_RADIUS * 1.8,
-    lineHeight: BALL_RADIUS * 2,
-    width: BALL_RADIUS * 2,
-    height: BALL_RADIUS * 2,
-    textAlign: 'center',
+  bgImg: {
+    position: 'absolute', top: 0, left: 0,
+    width: GAME_W, height: GAME_H, resizeMode: 'cover',
   },
-  playerEmoji: {
-    position: 'absolute',
-    fontSize: 32,
-    lineHeight: 40,
-    width: 40,
-    textAlign: 'center',
+  groundGrass: {
+    position: 'absolute', left: 0, right: 0,
+    top: GROUND_Y_POS - 5, height: 7,
+    backgroundColor: 'rgba(30,140,30,0.75)',
+    borderTopWidth: 1, borderTopColor: 'rgba(10,100,10,0.9)',
   },
+  groundSoil: {
+    position: 'absolute', left: 0, right: 0,
+    top: GROUND_Y_POS + 2, height: GAME_H,
+    backgroundColor: 'rgba(90,55,20,0.55)',
+  },
+  charWrap: { position: 'absolute', overflow: 'hidden' },
   leftZone: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: GAME_W / 2,
-    height: GAME_H,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 12,
+    position: 'absolute', left: 0, top: 0,
+    width: GAME_W / 2, height: GAME_H,
+    justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 12,
   },
   rightZone: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    width: GAME_W / 2,
-    height: GAME_H,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 12,
+    position: 'absolute', right: 0, top: 0,
+    width: GAME_W / 2, height: GAME_H,
+    justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 12,
   },
-  zoneArrow: {
-    color: 'rgba(255,255,255,0.18)',
-    fontSize: 28,
-    fontWeight: '900',
-  },
+  zoneArrow: { color: 'rgba(255,255,255,0.25)', fontSize: 28, fontWeight: '900' },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    zIndex: 10,
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 10,
   },
-  overlayTitle: { color: '#fff', fontSize: 26, fontWeight: '900', marginBottom: 8 },
-  overlayDesc: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
+  ovTitle: { color: '#fff', fontSize: 26, fontWeight: '900', marginBottom: 8 },
+  ovDesc: {
+    color: 'rgba(255,255,255,0.8)', fontSize: 14,
+    textAlign: 'center', marginBottom: 20, lineHeight: 22,
   },
-  startBtn: {
-    backgroundColor: '#f97316',
-    paddingHorizontal: 36,
-    paddingVertical: 12,
-    borderRadius: 24,
-  },
-  startBtnText: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  btn: { paddingHorizontal: 36, paddingVertical: 12, borderRadius: 24 },
+  btnTxt: { color: '#fff', fontSize: 18, fontWeight: '800' },
 });
