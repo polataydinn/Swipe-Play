@@ -3,45 +3,48 @@ import { View, TouchableOpacity, Text, StyleSheet, Dimensions, Image } from 'rea
 import { COLORS } from '../constants/colors';
 import { playTap, playCorrect, playWrong } from '../utils/sounds';
 
-const FUFU_IMG    = require('../assets/dino/fufu.png');
-const BG_IMG      = require('../assets/dino/BG.png');
-const OBJECTS_IMG = require('../assets/dino/objects.png');
+// ── attackonball assets ────────────────────────────────────────────────────────
+const BG_IMG       = require('../assets/attackonball/Bg.png');
+const LAND_IMG     = require('../assets/attackonball/Land0.png');
+const STICKMAN_IMG = require('../assets/attackonball/Stickman.png');
+const BALL_IMGS    = [
+  require('../assets/attackonball/Ball0.png'),
+  require('../assets/attackonball/Ball1.png'),
+  require('../assets/attackonball/Ball2.png'),
+  require('../assets/attackonball/Ball3.png'),
+  require('../assets/attackonball/Ball4.png'),
+];
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const GAME_W = Math.min(SW - 16, 360);
 const GAME_H = Math.min(SH * 0.68, 520);
 
-// ── Fufu sprite (828×140, 4 frames of 207px) ──
-const FUFU_SHEET_W = 828;
-const FUFU_SHEET_H = 140;
-const FUFU_FRAME_W = 207;
-const FUFU_SCALE   = 0.30;
-const CHAR_W = FUFU_FRAME_W * FUFU_SCALE;
-const CHAR_H = FUFU_SHEET_H * FUFU_SCALE;
-const FRAME_IDLE  = 0;
-const FRAME_WALK1 = 1;
-const FRAME_WALK2 = 2;
+// ── Stickman sprite: 256×64 → 4 frames of 64×64 ──────────────────────────────
+const STK_SHEET_W = 256;
+const STK_SHEET_H = 64;
+const STK_FRAME_W = 64;
+const STK_SCALE   = 0.75;   // display: 48×48
+const CHAR_W = STK_FRAME_W * STK_SCALE;
+const CHAR_H = STK_SHEET_H  * STK_SCALE;
 
-// ── Objects atlas (776×309) ──
-const OBJ_W = 776;
-const OBJ_H = 309;
+// ── Ball: 100×98, display at ~0.38 scale ─────────────────────────────────────
+const BALL_SCALE  = 0.38;
+const BALL_W      = 100 * BALL_SCALE;  // ≈38
+const BALL_H      = 98  * BALL_SCALE;  // ≈37
 
-// Falling item definitions – small objects from atlas
-const FALLING_ITEMS = [
-  { x: 739, y: 139, w: 30, h: 35, s: 1.1 },  // fruit
-  { x: 688, y: 132, w: 49, h: 41, s: 0.85 }, // mushroom_1
-  { x: 724, y:  30, w: 50, h: 41, s: 0.85 }, // mushroom_2
-  { x: 649, y:  24, w: 73, h: 47, s: 0.60 }, // bush_3
-  { x: 649, y:  73, w: 90, h: 54, s: 0.50 }, // stone
-];
+// ── Ground: Land0.png 1216×204, tile it across game width ────────────────────
+const LAND_H_ORIG = 204;
+const LAND_SCALE  = 0.22;
+const LAND_DISP_H = LAND_H_ORIG * LAND_SCALE; // ≈45
+const LAND_DISP_W = 1216 * LAND_SCALE;        // ≈267
 
-const PLAYER_Y_OFFSET = 60; // from bottom of game area
-const PLAYER_Y = GAME_H - PLAYER_Y_OFFSET - CHAR_H;
+const GROUND_Y  = GAME_H - LAND_DISP_H;
+const PLAYER_Y  = GROUND_Y - CHAR_H;
 
 const DIFFICULTY_CONFIG = {
-  0: { duration: 30, spawnMs: 1800, fallSpd: 3,   maxItems: 6,  playerSpd: 5 },
-  1: { duration: 30, spawnMs: 1200, fallSpd: 4.2,  maxItems: 9,  playerSpd: 6 },
-  2: { duration: 25, spawnMs: 800,  fallSpd: 5.8,  maxItems: 12, playerSpd: 7 },
+  0: { duration: 30, spawnMs: 1600, fallSpd: 3,   maxBalls: 6,  playerSpd: 5 },
+  1: { duration: 30, spawnMs: 1100, fallSpd: 4.2,  maxBalls: 9,  playerSpd: 6 },
+  2: { duration: 25, spawnMs: 750,  fallSpd: 5.8,  maxBalls: 12, playerSpd: 7 },
 };
 
 export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe, onUnlockSwipe }) {
@@ -49,7 +52,7 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
 
   const [phase,     setPhase]     = useState('ready');
   const [rs,        setRs]        = useState(null);
-  const [animFrame, setAnimFrame] = useState(FRAME_IDLE);
+  const [animFrame, setAnimFrame] = useState(0);
 
   const stRef    = useRef(null);
   const rafRef   = useRef(null);
@@ -59,12 +62,12 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
   const mounted  = useRef(true);
 
   const fresh = () => ({
-    playerX:   GAME_W / 2 - CHAR_W / 2,
-    items:     [],
-    timeLeft:  cfg.duration,
-    moveDir:   0,
-    nextId:    0,
-    phase:     'ready',
+    playerX: GAME_W / 2 - CHAR_W / 2,
+    balls: [],
+    timeLeft: cfg.duration,
+    moveDir: 0,
+    nextId: 0,
+    phase: 'ready',
   });
 
   useEffect(() => {
@@ -90,7 +93,7 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
     stopAll();
     stRef.current = fresh();
     setPhase('ready');
-    setAnimFrame(FRAME_IDLE);
+    setAnimFrame(0);
     setRs({ ...stRef.current });
   };
 
@@ -118,31 +121,30 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
     spawnRef.current = setInterval(() => {
       if (!mounted.current) return;
       const s = stRef.current;
-      if (s.phase !== 'play' || s.items.length >= cfg.maxItems) return;
-      const tmpl = FALLING_ITEMS[Math.floor(Math.random() * FALLING_ITEMS.length)];
-      s.items.push({
-        id: s.nextId++,
-        x: tmpl.w * tmpl.s / 2 + Math.random() * (GAME_W - tmpl.w * tmpl.s),
-        y: -tmpl.h * tmpl.s,
-        vy: cfg.fallSpd + Math.random() * 1.5,
-        vx: (Math.random() - 0.5) * 2.5,
-        frame: tmpl,
+      if (s.phase !== 'play' || s.balls.length >= cfg.maxBalls) return;
+      s.balls.push({
+        id:    s.nextId++,
+        x:     BALL_W / 2 + Math.random() * (GAME_W - BALL_W),
+        y:     -BALL_H,
+        vy:    cfg.fallSpd + Math.random() * 1.5,
+        vx:    (Math.random() - 0.5) * 2.5,
+        imgIdx: Math.floor(Math.random() * 5),
       });
     }, cfg.spawnMs);
 
-    // walk animation when moving
-    let wStep = FRAME_WALK1;
+    // walk animation (cycle stickman frames while moving)
+    let wStep = 0;
     animRef.current = setInterval(() => {
       if (!mounted.current) return;
       const s = stRef.current;
       if (s.phase !== 'play') return;
       if (s.moveDir !== 0) {
-        wStep = wStep === FRAME_WALK1 ? FRAME_WALK2 : FRAME_WALK1;
+        wStep = (wStep + 1) % 4;
         setAnimFrame(wStep);
       } else {
-        setAnimFrame(FRAME_IDLE);
+        setAnimFrame(0);
       }
-    }, 130);
+    }, 120);
 
     rafRef.current = requestAnimationFrame(loop);
   };
@@ -156,41 +158,38 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
     s.playerX += s.moveDir * cfg.playerSpd;
     s.playerX = Math.max(0, Math.min(GAME_W - CHAR_W, s.playerX));
 
-    // update items
-    for (const it of s.items) {
-      it.vy += 0.15;
-      it.x  += it.vx;
-      it.y  += it.vy;
-      if (it.x < 0)            { it.x = 0;                  it.vx =  Math.abs(it.vx); }
-      if (it.x > GAME_W - it.frame.w * it.frame.s)
-                                { it.x = GAME_W - it.frame.w * it.frame.s; it.vx = -Math.abs(it.vx); }
+    // update balls
+    for (const b of s.balls) {
+      b.vy += 0.15;
+      b.x  += b.vx;
+      b.y  += b.vy;
+      if (b.x < 0)               { b.x = 0;               b.vx =  Math.abs(b.vx); }
+      if (b.x > GAME_W - BALL_W) { b.x = GAME_W - BALL_W; b.vx = -Math.abs(b.vx); }
     }
-    s.items = s.items.filter(it => it.y < GAME_H + 40);
+    s.balls = s.balls.filter(b => b.y < GAME_H + 20);
 
-    // collision
+    // collision (AABB with margin)
     const mg = 8;
     const pL = s.playerX + mg;
     const pR = s.playerX + CHAR_W - mg;
     const pT = PLAYER_Y + mg;
     const pB = PLAYER_Y + CHAR_H - mg;
 
-    for (const it of s.items) {
-      const iW = it.frame.w * it.frame.s;
-      const iH = it.frame.h * it.frame.s;
-      if (pR > it.x + mg && pL < it.x + iW - mg &&
-          pB > it.y + mg && pT < it.y + iH - mg) {
+    for (const b of s.balls) {
+      if (pR > b.x + mg && pL < b.x + BALL_W - mg &&
+          pB > b.y + mg && pT < b.y + BALL_H - mg) {
         s.phase = 'dead';
         stopAll();
         if (onUnlockSwipe) onUnlockSwipe();
         setPhase('dead');
-        setRs({ playerX: s.playerX, items: [...s.items], timeLeft: s.timeLeft });
+        setRs({ playerX: s.playerX, balls: [...s.balls], timeLeft: s.timeLeft });
         playWrong();
         onWrong();
         return;
       }
     }
 
-    setRs({ playerX: s.playerX, items: [...s.items], timeLeft: s.timeLeft });
+    setRs({ playerX: s.playerX, balls: [...s.balls], timeLeft: s.timeLeft });
     rafRef.current = requestAnimationFrame(loop);
   };
 
@@ -198,8 +197,11 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
     if (stRef.current?.phase === 'play') stRef.current.moveDir = dir;
   };
 
-  const state = rs || fresh();
+  const state      = rs || fresh();
   const facingLeft = stRef.current?.moveDir === -1;
+
+  // Tile count to cover game width with land strip
+  const landTiles = Math.ceil(GAME_W / LAND_DISP_W) + 1;
 
   return (
     <View style={styles.root}>
@@ -210,23 +212,25 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
         {/* Background */}
         <Image source={BG_IMG} style={styles.bgImg} />
 
-        {/* Ground strip */}
-        <View style={styles.groundGrass} />
-        <View style={styles.groundSoil}  />
-
-        {/* Falling items */}
-        {(state.items || []).map(it => (
-          <AtlasSprite
-            key={it.id}
-            source={OBJECTS_IMG}
-            frame={it.frame}
-            sw={OBJ_W} sh={OBJ_H}
-            scale={it.frame.s}
-            x={it.x} y={it.y}
+        {/* Ground – tiled Land strip */}
+        {Array.from({ length: landTiles }).map((_, i) => (
+          <Image
+            key={i}
+            source={LAND_IMG}
+            style={[styles.landTile, { left: i * LAND_DISP_W, top: GROUND_Y }]}
           />
         ))}
 
-        {/* Player – Fufu */}
+        {/* Falling balls */}
+        {(state.balls || []).map(b => (
+          <Image
+            key={b.id}
+            source={BALL_IMGS[b.imgIdx]}
+            style={[styles.ball, { left: b.x, top: b.y }]}
+          />
+        ))}
+
+        {/* Player – stickman sprite */}
         <View style={[styles.charWrap, {
           left:      state.playerX,
           top:       PLAYER_Y,
@@ -235,11 +239,11 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
           transform: [{ scaleX: facingLeft ? -1 : 1 }],
         }]}>
           <Image
-            source={FUFU_IMG}
+            source={STICKMAN_IMG}
             style={{
-              width:  FUFU_SHEET_W * FUFU_SCALE,
-              height: FUFU_SHEET_H * FUFU_SCALE,
-              transform: [{ translateX: -animFrame * FUFU_FRAME_W * FUFU_SCALE }],
+              width:  STK_SHEET_W * STK_SCALE,
+              height: STK_SHEET_H * STK_SCALE,
+              transform: [{ translateX: -animFrame * STK_FRAME_W * STK_SCALE }],
             }}
           />
         </View>
@@ -269,8 +273,8 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
         {phase === 'ready' && (
           <Overlay>
             <Text style={styles.ovTitle}>Top Kaçış</Text>
-            <Text style={styles.ovDesc}>Sol/Sağ'a basılı tut{'\n'}nesnelerden kaç!</Text>
-            <TouchableOpacity style={[styles.btn, { backgroundColor: '#f97316' }]} onPress={startGame}>
+            <Text style={styles.ovDesc}>Sol/Sağ'a basılı tut{'\n'}toplardan kaç!</Text>
+            <TouchableOpacity style={[styles.btn, { backgroundColor: '#e74c3c' }]} onPress={startGame}>
               <Text style={styles.btnTxt}>BAŞLA</Text>
             </TouchableOpacity>
           </Overlay>
@@ -279,16 +283,16 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
           <Overlay>
             <Text style={styles.ovTitle}>Harika! 🎉</Text>
             <Text style={styles.ovDesc}>Hayatta kaldın!</Text>
-            <TouchableOpacity style={[styles.btn, { backgroundColor: '#22c55e' }]} onPress={resetGame}>
+            <TouchableOpacity style={[styles.btn, { backgroundColor: '#27ae60' }]} onPress={resetGame}>
               <Text style={styles.btnTxt}>TEKRAR</Text>
             </TouchableOpacity>
           </Overlay>
         )}
         {phase === 'dead' && (
           <Overlay>
-            <Text style={styles.ovTitle}>Çarpıştı! 💥</Text>
+            <Text style={styles.ovTitle}>Çarptı! 💥</Text>
             <Text style={styles.ovDesc}>Kalan süre: {Math.ceil(state.timeLeft)}s</Text>
-            <TouchableOpacity style={[styles.btn, { backgroundColor: '#ef4444' }]} onPress={resetGame}>
+            <TouchableOpacity style={[styles.btn, { backgroundColor: '#e74c3c' }]} onPress={resetGame}>
               <Text style={styles.btnTxt}>TEKRAR</Text>
             </TouchableOpacity>
           </Overlay>
@@ -298,26 +302,9 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
   );
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-function AtlasSprite({ source, frame, sw, sh, scale, x, y }) {
-  return (
-    <View style={{ position: 'absolute', left: x, top: y,
-                   width: frame.w * scale, height: frame.h * scale,
-                   overflow: 'hidden' }}>
-      <Image source={source} style={{
-        width: sw * scale, height: sh * scale,
-        transform: [{ translateX: -frame.x * scale }, { translateY: -frame.y * scale }],
-      }} />
-    </View>
-  );
-}
-
 function Overlay({ children }) {
   return <View style={styles.overlay}>{children}</View>;
 }
-
-// ── styles ────────────────────────────────────────────────────────────────────
-const GROUND_Y_POS = GAME_H - 56;
 
 const styles = StyleSheet.create({
   root: {
@@ -329,22 +316,23 @@ const styles = StyleSheet.create({
   arena: {
     width: GAME_W, height: GAME_H,
     borderRadius: 12, overflow: 'hidden', position: 'relative',
-    backgroundColor: '#87ceeb',
+    backgroundColor: '#b0d8f0',
   },
   bgImg: {
     position: 'absolute', top: 0, left: 0,
     width: GAME_W, height: GAME_H, resizeMode: 'cover',
   },
-  groundGrass: {
-    position: 'absolute', left: 0, right: 0,
-    top: GROUND_Y_POS - 5, height: 7,
-    backgroundColor: 'rgba(30,140,30,0.75)',
-    borderTopWidth: 1, borderTopColor: 'rgba(10,100,10,0.9)',
+  landTile: {
+    position: 'absolute',
+    width: LAND_DISP_W,
+    height: LAND_DISP_H,
+    resizeMode: 'stretch',
   },
-  groundSoil: {
-    position: 'absolute', left: 0, right: 0,
-    top: GROUND_Y_POS + 2, height: GAME_H,
-    backgroundColor: 'rgba(90,55,20,0.55)',
+  ball: {
+    position: 'absolute',
+    width:  BALL_W,
+    height: BALL_H,
+    resizeMode: 'contain',
   },
   charWrap: { position: 'absolute', overflow: 'hidden' },
   leftZone: {
@@ -357,17 +345,17 @@ const styles = StyleSheet.create({
     width: GAME_W / 2, height: GAME_H,
     justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 12,
   },
-  zoneArrow: { color: 'rgba(255,255,255,0.25)', fontSize: 28, fontWeight: '900' },
+  zoneArrow: { color: 'rgba(255,255,255,0.30)', fontSize: 28, fontWeight: '900' },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center', alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.60)', zIndex: 10,
   },
   ovTitle: { color: '#fff', fontSize: 26, fontWeight: '900', marginBottom: 8 },
   ovDesc: {
     color: 'rgba(255,255,255,0.8)', fontSize: 14,
     textAlign: 'center', marginBottom: 20, lineHeight: 22,
   },
-  btn: { paddingHorizontal: 36, paddingVertical: 12, borderRadius: 24 },
+  btn:    { paddingHorizontal: 36, paddingVertical: 12, borderRadius: 24 },
   btnTxt: { color: '#fff', fontSize: 18, fontWeight: '800' },
 });

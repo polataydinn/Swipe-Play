@@ -3,52 +3,48 @@ import { View, TouchableOpacity, Text, StyleSheet, Dimensions, Image } from 'rea
 import { COLORS } from '../constants/colors';
 import { playTap, playCorrect, playWrong } from '../utils/sounds';
 
-const FUFU_IMG    = require('../assets/dino/fufu.png');
-const BG_IMG      = require('../assets/dino/BG.png');
-const OBJECTS_IMG = require('../assets/dino/objects.png');
+// ── bike assets ───────────────────────────────────────────────────────────────
+const BG_IMG     = require('../assets/bike/gameBg_0.jpg');
+const PLAYER_IMG = require('../assets/bike/player_json.png');
+const BIRD_IMG   = require('../assets/bike/bird.png');
+const ROD_IMG    = require('../assets/bike/rod.png');
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const GAME_W = Math.min(SW - 16, 360);
 const GAME_H = Math.min(SH * 0.68, 520);
 
-// ── Fufu sprite (828×140, 4 frames of 207px) ──
-const FUFU_SHEET_W = 828;
-const FUFU_SHEET_H = 140;
-const FUFU_FRAME_W = 207;
-const FUFU_SCALE   = 0.30;
-const CHAR_W = FUFU_FRAME_W * FUFU_SCALE;
-const CHAR_H = FUFU_SHEET_H * FUFU_SCALE;
-const FRAME_WALK1 = 1;
-const FRAME_WALK2 = 2;
-const FRAME_JUMP  = 3;
+// ── Player sprite sheet: 350×350, 4 frames of 161×164 ────────────────────────
+// Positions: (0,0) (166,0) (0,169) (166,169)
+const P_SHEET_W = 350;
+const P_SHEET_H = 350;
+const P_FRAME_W = 161;
+const P_FRAME_H = 164;
+const P_SCALE   = 0.28;   // display: ~45×46
+const CHAR_W    = P_FRAME_W * P_SCALE;
+const CHAR_H    = P_FRAME_H * P_SCALE;
 
-// ── Objects atlas (776×309) ──
-const OBJ_W = 776;
-const OBJ_H = 309;
-
-// Ground obstacles
-const GROUND_OBSTACLES = [
-  { x: 649, y:  73, w: 90, h: 54 }, // stone
-  { x: 570, y:  50, w: 77, h: 77 }, // crate
-  { x: 649, y:  24, w: 73, h: 47 }, // bush_3
+const P_FRAMES = [
+  { x:   0, y:   0 },
+  { x: 166, y:   0 },
+  { x:   0, y: 169 },
+  { x: 166, y: 169 },
 ];
-// Airborne obstacles (appear at mid-height, dodge by crouching low… but we
-// only have jump, so treat them as high obstacles that require NOT jumping).
-// Visually they float – use mushrooms.
-const FLY_OBSTACLES = [
-  { x: 688, y: 132, w: 49, h: 41 }, // mushroom_1
-  { x: 724, y:  30, w: 50, h: 41 }, // mushroom_2
-];
-const OBJ_SCALE = 0.80;
 
-// ── BG parallax – two copies side by side ──
-// With resizeMode='stretch' we tile manually
-const BG_TILE_W = GAME_W; // each copy fills game width
+// ── Bird obstacle: 108×55 ──────────────────────────────────────────────────
+const BIRD_SCALE = 0.45;
+const BIRD_W     = 108 * BIRD_SCALE;
+const BIRD_H     = 55  * BIRD_SCALE;
 
-const CHAR_X    = GAME_W * 0.14;
-const GRAVITY   = 0.55;
-const JUMP_VY   = -13;
-const GROUND_Y  = GAME_H * 0.78;
+// ── Rod obstacle: 750×225 (single image used as ground barrier) ───────────────
+const ROD_SCALE = 0.14;
+const ROD_W     = 750 * ROD_SCALE;  // ≈105
+const ROD_H     = 225 * ROD_SCALE;  // ≈32
+
+// ── Layout ────────────────────────────────────────────────────────────────────
+const CHAR_X   = GAME_W * 0.14;
+const GRAVITY  = 0.55;
+const JUMP_VY  = -13;
+const GROUND_Y = GAME_H * 0.78;
 
 const DIFFICULTY_CONFIG = {
   0: { duration: 30, speed: 5,   spawnMs: 1700, flyChance: 0.30 },
@@ -61,7 +57,8 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
 
   const [phase,     setPhase]     = useState('ready');
   const [rs,        setRs]        = useState(null);
-  const [animFrame, setAnimFrame] = useState(FRAME_WALK1);
+  const [frameIdx,  setFrameIdx]  = useState(0);
+  const [birdFlap,  setBirdFlap]  = useState(0); // 0 or 1 for bird wing
 
   const stRef    = useRef(null);
   const rafRef   = useRef(null);
@@ -105,7 +102,7 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
     stopAll();
     stRef.current = fresh();
     setPhase('ready');
-    setAnimFrame(FRAME_WALK1);
+    setFrameIdx(0);
     setRs({ ...stRef.current });
   };
 
@@ -137,34 +134,40 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
       const isFly = Math.random() < cfg.flyChance;
       const id    = s.nextId++;
       if (isFly) {
-        const f = FLY_OBSTACLES[Math.floor(Math.random() * FLY_OBSTACLES.length)];
+        // Bird flies at mid height – must jump over or duck under
         s.obstacles.push({
           id, x: GAME_W + 20,
           y: GROUND_Y - CHAR_H * 1.8,
-          frame: f, scale: OBJ_SCALE, type: 'fly',
+          type: 'bird',
         });
       } else {
-        const f = GROUND_OBSTACLES[Math.floor(Math.random() * GROUND_OBSTACLES.length)];
+        // Rod on the ground
         s.obstacles.push({
           id, x: GAME_W + 20,
-          y: GROUND_Y - f.h * OBJ_SCALE,
-          frame: f, scale: OBJ_SCALE, type: 'ground',
+          y: GROUND_Y - ROD_H,
+          type: 'rod',
         });
       }
     }, cfg.spawnMs);
 
-    let wStep = FRAME_WALK1;
+    // Animate player frames + bird flap
+    let pStep = 0;
+    let bStep = 0;
     animRef.current = setInterval(() => {
       if (!mounted.current) return;
       const s = stRef.current;
       if (s.phase !== 'play') return;
-      if (!s.onGround) {
-        setAnimFrame(FRAME_JUMP);
+      // Player: cycle walk frames on ground, hold jump frame in air
+      if (s.onGround) {
+        pStep = (pStep + 1) % 4;
+        setFrameIdx(pStep);
       } else {
-        wStep = wStep === FRAME_WALK1 ? FRAME_WALK2 : FRAME_WALK1;
-        setAnimFrame(wStep);
+        setFrameIdx(3); // airborne frame
       }
-    }, 130);
+      // Bird flap
+      bStep = bStep === 0 ? 1 : 0;
+      setBirdFlap(bStep);
+    }, 120);
 
     rafRef.current = requestAnimationFrame(loop);
   };
@@ -186,13 +189,13 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
       s.onGround = false;
     }
 
-    // scroll BG
-    s.bgOffset = (s.bgOffset + cfg.speed * 0.5) % BG_TILE_W;
+    // scroll bg
+    s.bgOffset = (s.bgOffset + cfg.speed * 0.4) % GAME_W;
 
     // move obstacles
     s.obstacles = s.obstacles
       .map(o => ({ ...o, x: o.x - cfg.speed }))
-      .filter(o => o.x + o.frame.w * o.scale > -10);
+      .filter(o => o.x + (o.type === 'bird' ? BIRD_W : ROD_W) > -10);
 
     // collision (AABB with margin)
     const mg = 7;
@@ -202,11 +205,10 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
     const cB = s.charY + CHAR_H - mg;
 
     for (const o of s.obstacles) {
-      const oL = o.x + mg;
-      const oR = o.x + o.frame.w * o.scale - mg;
-      const oT = o.y + mg;
-      const oB = o.y + o.frame.h * o.scale - mg;
-      if (cR > oL && cL < oR && cB > oT && cT < oB) {
+      const oW = o.type === 'bird' ? BIRD_W : ROD_W;
+      const oH = o.type === 'bird' ? BIRD_H : ROD_H;
+      if (cR > o.x + mg && cL < o.x + oW - mg &&
+          cB > o.y + mg && cT < o.y + oH - mg) {
         s.phase = 'dead';
         stopAll();
         if (onUnlockSwipe) onUnlockSwipe();
@@ -244,6 +246,7 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
   const state   = rs || fresh();
   const charTop = state.charY !== undefined ? state.charY : GROUND_Y - CHAR_H;
   const bgOff   = state.bgOffset || 0;
+  const pf      = P_FRAMES[frameIdx] || P_FRAMES[0];
 
   return (
     <View style={styles.root}>
@@ -251,34 +254,44 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
       <Text style={styles.sub}>Süre: {Math.ceil(state.timeLeft ?? cfg.duration)}s</Text>
 
       <TouchableOpacity style={styles.arena} onPress={handleTap} activeOpacity={1}>
-        {/* Parallax BG – two tiles scrolling left */}
+        {/* Parallax BG – two copies */}
         <Image source={BG_IMG} style={[styles.bgTile, { left: -bgOff }]} />
-        <Image source={BG_IMG} style={[styles.bgTile, { left: BG_TILE_W - bgOff }]} />
-
-        {/* Ground */}
-        <View style={styles.groundGrass} />
-        <View style={styles.groundSoil}  />
+        <Image source={BG_IMG} style={[styles.bgTile, { left: GAME_W - bgOff }]} />
 
         {/* Obstacles */}
-        {(state.obstacles || []).map(o => (
-          <AtlasSprite
-            key={o.id}
-            source={OBJECTS_IMG}
-            frame={o.frame}
-            sw={OBJ_W} sh={OBJ_H}
-            scale={o.scale}
-            x={o.x} y={o.y}
-          />
-        ))}
+        {(state.obstacles || []).map(o => {
+          if (o.type === 'bird') {
+            return (
+              <Image
+                key={o.id}
+                source={BIRD_IMG}
+                style={[styles.bird, {
+                  left: o.x, top: o.y,
+                  transform: [{ scaleX: birdFlap === 1 ? -1 : 1 }],
+                }]}
+              />
+            );
+          }
+          return (
+            <Image
+              key={o.id}
+              source={ROD_IMG}
+              style={[styles.rod, { left: o.x, top: o.y }]}
+            />
+          );
+        })}
 
-        {/* Fufu character */}
+        {/* Player – cycling through 4 sprite frames */}
         <View style={[styles.charWrap, { left: CHAR_X, top: charTop, width: CHAR_W, height: CHAR_H }]}>
           <Image
-            source={FUFU_IMG}
+            source={PLAYER_IMG}
             style={{
-              width:  FUFU_SHEET_W * FUFU_SCALE,
-              height: FUFU_SHEET_H * FUFU_SCALE,
-              transform: [{ translateX: -animFrame * FUFU_FRAME_W * FUFU_SCALE }],
+              width:  P_SHEET_W * P_SCALE,
+              height: P_SHEET_H * P_SCALE,
+              transform: [
+                { translateX: -pf.x * P_SCALE },
+                { translateY: -pf.y * P_SCALE },
+              ],
             }}
           />
         </View>
@@ -296,7 +309,7 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
           <Overlay>
             <Text style={styles.ovTitle}>Bisikletçi</Text>
             <Text style={styles.ovDesc}>Dokunarak zıpla!{'\n'}Çift zıplama yapabilirsin.</Text>
-            <View style={[styles.btn, { backgroundColor: '#22c55e' }]}>
+            <View style={[styles.btn, { backgroundColor: '#27ae60' }]}>
               <Text style={styles.btnTxt}>BAŞLA</Text>
             </View>
           </Overlay>
@@ -305,7 +318,7 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
           <Overlay>
             <Text style={styles.ovTitle}>Tebrikler! 🎉</Text>
             <Text style={styles.ovDesc}>Bitişe ulaştın!</Text>
-            <View style={[styles.btn, { backgroundColor: '#22c55e' }]}>
+            <View style={[styles.btn, { backgroundColor: '#27ae60' }]}>
               <Text style={styles.btnTxt}>TEKRAR</Text>
             </View>
           </Overlay>
@@ -314,7 +327,7 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
           <Overlay>
             <Text style={styles.ovTitle}>Çarptı! 💥</Text>
             <Text style={styles.ovDesc}>Kalan süre: {Math.ceil(state.timeLeft)}s</Text>
-            <View style={[styles.btn, { backgroundColor: '#ef4444' }]}>
+            <View style={[styles.btn, { backgroundColor: '#e74c3c' }]}>
               <Text style={styles.btnTxt}>TEKRAR</Text>
             </View>
           </Overlay>
@@ -324,25 +337,10 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
   );
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-function AtlasSprite({ source, frame, sw, sh, scale, x, y }) {
-  return (
-    <View style={{ position: 'absolute', left: x, top: y,
-                   width: frame.w * scale, height: frame.h * scale,
-                   overflow: 'hidden' }}>
-      <Image source={source} style={{
-        width: sw * scale, height: sh * scale,
-        transform: [{ translateX: -frame.x * scale }, { translateY: -frame.y * scale }],
-      }} />
-    </View>
-  );
-}
-
 function Overlay({ children }) {
   return <View style={styles.overlay}>{children}</View>;
 }
 
-// ── styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
@@ -357,19 +355,18 @@ const styles = StyleSheet.create({
   },
   bgTile: {
     position: 'absolute', top: 0,
-    width: BG_TILE_W, height: GAME_H,
+    width: GAME_W, height: GAME_H,
     resizeMode: 'cover',
   },
-  groundGrass: {
-    position: 'absolute', left: 0, right: 0,
-    top: GROUND_Y - 5, height: 7,
-    backgroundColor: 'rgba(30,140,30,0.75)',
-    borderTopWidth: 1, borderTopColor: 'rgba(10,100,10,0.9)',
+  bird: {
+    position: 'absolute',
+    width: BIRD_W, height: BIRD_H,
+    resizeMode: 'contain',
   },
-  groundSoil: {
-    position: 'absolute', left: 0, right: 0,
-    top: GROUND_Y + 2, height: GAME_H,
-    backgroundColor: 'rgba(90,55,20,0.55)',
+  rod: {
+    position: 'absolute',
+    width: ROD_W, height: ROD_H,
+    resizeMode: 'stretch',
   },
   charWrap: { position: 'absolute', overflow: 'hidden' },
   jumpDots: {
@@ -383,13 +380,13 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center', alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.60)', zIndex: 20,
   },
   ovTitle: { color: '#fff', fontSize: 26, fontWeight: '900', marginBottom: 8 },
   ovDesc: {
     color: 'rgba(255,255,255,0.8)', fontSize: 14,
     textAlign: 'center', marginBottom: 20, lineHeight: 22,
   },
-  btn: { paddingHorizontal: 36, paddingVertical: 12, borderRadius: 24 },
+  btn:    { paddingHorizontal: 36, paddingVertical: 12, borderRadius: 24 },
   btnTxt: { color: '#fff', fontSize: 18, fontWeight: '800' },
 });
