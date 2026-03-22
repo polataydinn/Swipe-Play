@@ -142,10 +142,12 @@ const GAME_ICONS = {
   'circle-draw': '⭕',
   'egg-farm': '🥚',
   'hunting-game': '🎯',
-  'monochromatic-game': '🎨',
   'flappy-first': '🚀',
   'fishing-net': '🎣',
   'gold-miner': '⛏️',
+  'dinosaur-game': '🦕',
+  'ball-dodge': '💨',
+  'bike-jump': '🚴',
 };
 
 export default function GameListScreen({ onSelectGame }) {

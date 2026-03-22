@@ -14,9 +14,9 @@ const JUMP_VY = -11;
 const GROUND_Y_RATIO = 0.75;
 
 const DIFFICULTY_CONFIG = {
-  0: { duration: 35, obstacleSpeed: 3.5, spawnMs: 2200, flyChance: 0.2 },
-  1: { duration: 30, obstacleSpeed: 5,   spawnMs: 1600, flyChance: 0.35 },
-  2: { duration: 25, obstacleSpeed: 7,   spawnMs: 1100, flyChance: 0.5 },
+  0: { duration: 30, obstacleSpeed: 5,   spawnMs: 1700, flyChance: 0.3 },
+  1: { duration: 28, obstacleSpeed: 6.5, spawnMs: 1200, flyChance: 0.45 },
+  2: { duration: 25, obstacleSpeed: 9,   spawnMs: 850,  flyChance: 0.6 },
 };
 
 export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, onUnlockSwipe }) {
@@ -246,6 +246,7 @@ export default function BikeJump({ difficulty, onCorrect, onWrong, onLockSwipe, 
         <Text style={[styles.charEmoji, {
           left: CHAR_X,
           top: rs.char ? rs.char.y : GROUND_Y_RENDER - CHAR_H,
+          transform: [{ scaleX: -1 }],
         }]}>🚴</Text>
 
         {/* Obstacles */}

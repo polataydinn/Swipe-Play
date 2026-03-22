@@ -66,9 +66,8 @@ export const GAME_DESCRIPTIONS = [
   { id: 'flappy-first', title: '3D Flappy', shortDesc: 'İlk şahıs Flappy Bird!', fullDesc: 'Tünelin içinden uç! 3D perspektiften borulardan geç, dokunarak yukarı çık.', accent: '#facc15', singleLevel: true },
   { id: 'fishing-net', title: 'Ağ Balıkçılık', shortDesc: 'Ağ çizerek balık yakala.', fullDesc: 'Parmağını hızlıca kaydırarak balıkların üzerinden geç ve ağa takılmalarını sağla!', accent: '#38bdf8', singleLevel: true },
   { id: 'gold-miner', title: 'Altın Madenci', shortDesc: 'Kancayı fırlat, madenleri topla.', fullDesc: 'Salınan kancayı doğru anda fırlat! Altın ve elmas yakala, kayadan kaçın.', accent: '#f59e0b' },
-  { id: 'twin-runner', title: 'İkiz Koşucu', shortDesc: 'İki karakteri aynı anda atla!', fullDesc: 'Ekranın üst ve alt yarısına dokunarak iki koşucuyu eş zamanlı zıplat, engellerden kaçın!', accent: '#6366f1' },
-  { id: 'ball-dodge', title: 'Top Kaçış', shortDesc: 'Düşen toplardan kaçın!', fullDesc: 'Sağa sola hareket ederek yukarıdan düşen toplardan kaçın. Hayatta kaldıkça puan kazan!', accent: '#f97316' },
-  { id: 'bike-jump', title: 'Bisikletçi', shortDesc: 'Engelleri atlayarak ilerle!', fullDesc: 'Dokunarak zıpla, çift zıplama yaparak engelleri ve uçan kuşları aş!', accent: '#22c55e' },
-  { id: 'stack-tower', title: 'Kule İnşa', shortDesc: 'Platformları üst üste dengele!', fullDesc: 'Sallanan platformu tam üstüne denk getir ve bas! Hassas yerleştir, kuleyi büyüt!', accent: '#eab308' },
-  { id: 'bottle-drop', title: 'Şişe Fırlat', shortDesc: 'Şişeyi boşluktan geçir!', fullDesc: 'Sallanan şişeyi tam boşluğa denk gelince bırak! Her geçişte boşluk değişir.', accent: '#38bdf8' },
+  { id: 'dinosaur-game', title: 'Fufu Koşusu', shortDesc: 'Engelleri atla, meyve topla!', fullDesc: 'Fufu karakteriyle koş! Dokunarak zıpla (çift zıplama var), taş/kasadan kaç, meyveleri topla.', accent: '#f97316' },
+
+  { id: 'ball-dodge', title: 'Top Kaçış', shortDesc: 'Düşen toplardan kaçın!', fullDesc: 'Sağa sola hareket ederek yukarıdan düşen toplardan kaçın. Hayatta kaldıkça puan kazan!', accent: '#f97316', singleLevel: true },
+  { id: 'bike-jump', title: 'Bisikletçi', shortDesc: 'Engelleri atlayarak ilerle!', fullDesc: 'Dokunarak zıpla, çift zıplama yaparak engelleri ve uçan kuşları aş!', accent: '#22c55e', singleLevel: true },
 ];

@@ -40,11 +40,9 @@ import HuntingGame from '../games/HuntingGame';
 import FlappyFirst from '../games/FlappyFirst';
 import FishingNet from '../games/FishingNet';
 import GoldMiner from '../games/GoldMiner';
-import TwinRunner from '../games/TwinRunner';
+import DinosaurGame from '../games/DinosaurGame';
 import BallDodge from '../games/BallDodge';
 import BikeJump from '../games/BikeJump';
-import StackTower from '../games/StackTower';
-import BottleDrop from '../games/BottleDrop';
 
 export const GAME_COMPONENTS = {
   'color-memory': ColorMemory,
@@ -89,9 +87,7 @@ export const GAME_COMPONENTS = {
   'flappy-first': FlappyFirst,
   'fishing-net': FishingNet,
   'gold-miner': GoldMiner,
-  'twin-runner': TwinRunner,
+  'dinosaur-game': DinosaurGame,
   'ball-dodge': BallDodge,
   'bike-jump': BikeJump,
-  'stack-tower': StackTower,
-  'bottle-drop': BottleDrop,
 };

@@ -197,6 +197,7 @@ export default function BallDodge({ difficulty, onCorrect, onWrong, onLockSwipe,
         <Text style={[styles.playerEmoji, {
           left: rs.playerX,
           top: PLAYER_Y,
+          transform: [{ scaleX: -1 }],
         }]}>🏃</Text>
 
         {/* Touch zones - left and right halves, shown only in play */}
