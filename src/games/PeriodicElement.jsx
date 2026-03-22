@@ -31,10 +31,9 @@ const ELEMENTS = [
   { symbol: 'Au', name: 'Altın', number: 79, row: 3, col: 6 },
   { symbol: 'Pb', name: 'Kurşun', number: 82, row: 3, col: 7 },
 ];
-const DIFFICULTY_CONFIG = { 0: { pool: 10 }, 1: { pool: 18 }, 2: { pool: 26 } };
 const ELEM_COLORS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 export default function PeriodicElement({ difficulty, onCorrect, onWrong }) {
-  const config = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG[0];
+  const config = { pool: 26 };
   const [target, setTarget] = useState(null);
   const [streak, setStreak] = useState(0);
   const pool = ELEMENTS.slice(0, config.pool);

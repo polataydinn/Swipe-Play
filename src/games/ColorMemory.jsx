@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Dimensions } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { COLORS } from '../constants/colors';
-import { playTap, playTick } from '../utils/sounds';
+import { playTap } from '../utils/sounds';
 
 const GAME_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e91e63', '#ff9800'];
 const { width: SW } = Dimensions.get('window');
@@ -17,11 +16,17 @@ export default function ColorMemory({ difficulty, onCorrect, onWrong }) {
   const config = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG[0];
   const [sequence, setSequence] = useState([]);
   const [userInput, setUserInput] = useState([]);
-  const [phase, setPhase] = useState('showing'); // showing | input | result
+  const [phase, setPhase] = useState('showing');
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [showingBlank, setShowingBlank] = useState(false);
   const [round, setRound] = useState(0);
   const availableColors = GAME_COLORS.slice(0, config.maxColors);
-  const timeoutRef = useRef(null);
+  const timersRef = useRef([]);
+
+  const clearTimers = () => {
+    timersRef.current.forEach(t => clearTimeout(t));
+    timersRef.current = [];
+  };
 
   const generateSequence = useCallback((len) => {
     return Array.from({ length: len }, () =>
@@ -30,26 +35,41 @@ export default function ColorMemory({ difficulty, onCorrect, onWrong }) {
   }, [config.maxColors]);
 
   const startRound = useCallback(() => {
+    clearTimers();
     const len = config.startLen + round;
     const seq = generateSequence(len);
     setSequence(seq);
     setUserInput([]);
     setPhase('showing');
     setActiveIdx(-1);
+    setShowingBlank(false);
 
-    // Show sequence one by one
+    const blankTime = 300;
+    let delay = config.showTime;
+
     seq.forEach((_, i) => {
-      timeoutRef.current = setTimeout(() => setActiveIdx(i), (i + 1) * config.showTime);
+      timersRef.current.push(setTimeout(() => {
+        setShowingBlank(false);
+        setActiveIdx(i);
+      }, delay));
+      delay += config.showTime;
+      timersRef.current.push(setTimeout(() => {
+        setShowingBlank(true);
+        setActiveIdx(-1);
+      }, delay));
+      delay += blankTime;
     });
-    timeoutRef.current = setTimeout(() => {
+
+    timersRef.current.push(setTimeout(() => {
       setActiveIdx(-1);
+      setShowingBlank(false);
       setPhase('input');
-    }, (seq.length + 1) * config.showTime);
+    }, delay));
   }, [config, round, generateSequence]);
 
   useEffect(() => {
     startRound();
-    return () => clearTimeout(timeoutRef.current);
+    return () => clearTimers();
   }, [round, difficulty]);
 
   const handlePress = (colorIdx) => {
@@ -64,7 +84,6 @@ export default function ColorMemory({ difficulty, onCorrect, onWrong }) {
       setPhase('result');
       setTimeout(() => {
         setRound(0);
-        startRound();
       }, 1000);
       return;
     }
@@ -79,16 +98,16 @@ export default function ColorMemory({ difficulty, onCorrect, onWrong }) {
   return (
     <View style={styles.container}>
       <Text style={styles.info}>
-        {phase === 'showing' ? 'İzle...' : phase === 'input' ? 'Tekrarla!' : ''}
+        {phase === 'showing' ? 'Izle...' : phase === 'input' ? 'Tekrarla!' : ''}
       </Text>
       <Text style={styles.round}>Tur: {round + 1}</Text>
       <View style={styles.display}>
-        {phase === 'showing' && activeIdx >= 0 && (
+        {phase === 'showing' && activeIdx >= 0 && !showingBlank && (
           <View style={[styles.showBox, { backgroundColor: GAME_COLORS[sequence[activeIdx]] }]} />
         )}
-        {phase === 'showing' && activeIdx < 0 && (
+        {phase === 'showing' && (activeIdx < 0 || showingBlank) && (
           <View style={[styles.showBox, { backgroundColor: COLORS.surface }]}>
-            <Text style={styles.readyText}>Hazır ol...</Text>
+            <Text style={styles.readyText}>{showingBlank ? '' : 'Hazir ol...'}</Text>
           </View>
         )}
         {phase === 'input' && (

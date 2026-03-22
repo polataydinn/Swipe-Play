@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS, DIFFICULTY_COLORS, DIFFICULTY_LABELS, DIFFICULTY_EMOJIS } from '../constants/colors';
 
-export default function HUD({ score, difficulty, onBack }) {
+export default function HUD({ score, difficulty, onBack, singleLevel }) {
   const diffColor = DIFFICULTY_COLORS[difficulty] || COLORS.easy;
   const diffLabel = DIFFICULTY_LABELS[difficulty] || 'EASY';
   const diffEmoji = DIFFICULTY_EMOJIS[difficulty] || '🟢';
@@ -18,10 +18,12 @@ export default function HUD({ score, difficulty, onBack }) {
         <Text style={styles.scoreLabel}>SKOR</Text>
         <Text style={styles.scoreValue}>{score}</Text>
       </View>
-      <View style={[styles.badge, { backgroundColor: diffColor + '30', borderColor: diffColor }]}>
-        <Text style={styles.badgeEmoji}>{diffEmoji}</Text>
-        <Text style={[styles.badgeText, { color: diffColor }]}>{diffLabel}</Text>
-      </View>
+      {!singleLevel && (
+        <View style={[styles.badge, { backgroundColor: diffColor + '30', borderColor: diffColor }]}>
+          <Text style={styles.badgeEmoji}>{diffEmoji}</Text>
+          <Text style={[styles.badgeText, { color: diffColor }]}>{diffLabel}</Text>
+        </View>
+      )}
     </View>
   );
 }

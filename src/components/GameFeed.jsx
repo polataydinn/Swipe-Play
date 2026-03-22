@@ -54,6 +54,9 @@ export default function GameFeed({ startGameId, onBack }) {
   const isAnimating = useSharedValue(false);
   const pendingReset = useSharedValue(0);
   const deckLength = gameDeck.length;
+  const isSingleLevelSV = useSharedValue(0);
+  // Worklet-side lock: updated synchronously so the gesture worklet sees it immediately
+  const swipeLockedSV = useSharedValue(0);
 
   const handleCorrect = useCallback(() => {
     addScore(currentDifficulty);
@@ -67,10 +70,12 @@ export default function GameFeed({ startGameId, onBack }) {
   }, []);
 
   const onLockSwipe = useCallback(() => {
+    swipeLockedSV.value = 1;
     setSwipeLocked(true);
   }, []);
 
   const onUnlockSwipe = useCallback(() => {
+    swipeLockedSV.value = 0;
     setSwipeLocked(false);
   }, []);
 
@@ -84,6 +89,7 @@ export default function GameFeed({ startGameId, onBack }) {
   }, [currentGameIdx]);
 
   useEffect(() => {
+    swipeLockedSV.value = 0;
     setSwipeLocked(false);
   }, [currentGameIdx]);
 
@@ -99,15 +105,17 @@ export default function GameFeed({ startGameId, onBack }) {
     setCurrentDifficulty(newDiff);
   }, []);
 
-  // IMPORTANT: .enabled(!swipeLocked) fully disables native gesture when maze is active
+  // panGesture: .enabled() handles React-side, swipeLockedSV handles worklet-side (no render delay)
   const panGesture = Gesture.Pan()
     .enabled(!swipeLocked)
     .onStart(() => {
       'worklet';
+      if (swipeLockedSV.value) return;
       lockedAxis.value = 0;
     })
     .onUpdate((e) => {
       'worklet';
+      if (swipeLockedSV.value) return;
       if (isAnimating.value) return;
 
       const absX = Math.abs(e.translationX);
@@ -127,6 +135,7 @@ export default function GameFeed({ startGameId, onBack }) {
         if (idx >= deckLength - 1 && ty < 0) ty *= RUBBER_FACTOR;
         dragY.value = ty;
       } else {
+        if (isSingleLevelSV.value === 1) return;
         let tx = e.translationX;
         const diff = diffSV.value;
         if (diff === 0 && tx > 0) tx *= RUBBER_FACTOR;
@@ -136,6 +145,11 @@ export default function GameFeed({ startGameId, onBack }) {
     })
     .onEnd((e) => {
       'worklet';
+      if (swipeLockedSV.value) {
+        dragY.value = withTiming(0, SNAP_TIMING);
+        translateX.value = withTiming(0, SNAP_TIMING);
+        return;
+      }
       if (isAnimating.value) return;
 
       const axis = lockedAxis.value;
@@ -159,11 +173,13 @@ export default function GameFeed({ startGameId, onBack }) {
           dragY.value = withTiming(0, SNAP_TIMING);
         }
       } else if (axis === 1) {
-        const diff = diffSV.value;
-        if (e.translationX < -SWIPE_X_THRESHOLD && diff < 2) {
-          runOnJS(commitHorizontal)(diff + 1);
-        } else if (e.translationX > SWIPE_X_THRESHOLD && diff > 0) {
-          runOnJS(commitHorizontal)(diff - 1);
+        if (isSingleLevelSV.value !== 1) {
+          const diff = diffSV.value;
+          if (e.translationX < -SWIPE_X_THRESHOLD && diff < 2) {
+            runOnJS(commitHorizontal)(diff + 1);
+          } else if (e.translationX > SWIPE_X_THRESHOLD && diff > 0) {
+            runOnJS(commitHorizontal)(diff - 1);
+          }
         }
         translateX.value = withSpring(0, { damping: 20, stiffness: 300 });
       } else {
@@ -189,6 +205,10 @@ export default function GameFeed({ startGameId, onBack }) {
   const nextGame = currentGameIdx < gameDeck.length - 1 ? gameDeck[currentGameIdx + 1] : null;
 
   const GameComponent = GAME_COMPONENTS[currentGame?.id];
+  const isSingleLevel = !!currentGame?.singleLevel;
+  useEffect(() => {
+    isSingleLevelSV.value = isSingleLevel ? 1 : 0;
+  }, [isSingleLevel]);
 
   if (!currentGame || !GameComponent) return null;
 
@@ -199,7 +219,7 @@ export default function GameFeed({ startGameId, onBack }) {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
       <View style={[styles.hudContainer, { paddingTop: insets.top + 8 }]}>
-        <HUD score={score} difficulty={currentDifficulty} onBack={onBack} />
+        <HUD score={score} difficulty={currentDifficulty} onBack={onBack} singleLevel={isSingleLevel} />
       </View>
 
       <GestureDetector gesture={panGesture}>
@@ -234,6 +254,7 @@ export default function GameFeed({ startGameId, onBack }) {
               game={currentGame}
               difficultyShared={difficultyShared}
               translateX={translateX}
+              singleLevel={isSingleLevel}
             />
           </Animated.View>
 
@@ -257,18 +278,21 @@ export default function GameFeed({ startGameId, onBack }) {
   );
 }
 
-function BottomInfo({ game, difficultyShared, translateX }) {
+function BottomInfo({ game, difficultyShared, translateX, singleLevel }) {
   return (
     <View style={styles.bottomArea}>
-      <DifficultyDots
-        difficulty={difficultyShared}
-        translateX={translateX}
-        screenWidth={SW}
-      />
+      {!singleLevel && (
+        <DifficultyDots
+          difficulty={difficultyShared}
+          translateX={translateX}
+          screenWidth={SW}
+        />
+      )}
       <GameCaption
         title={game.title}
         shortDesc={game.shortDesc}
         fullDesc={game.fullDesc}
+        singleLevel={singleLevel}
       />
     </View>
   );

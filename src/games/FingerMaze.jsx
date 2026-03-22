@@ -14,74 +14,105 @@ const DIFFICULTY_CONFIG = {
   2: { gridSize: 7, wallCount: 16 },
 };
 
-function generateMaze(gridSize, wallCount) {
+/**
+ * Generate a maze guaranteed to have a path from top-left to bottom-right.
+ *
+ * Uses recursive backtracking (iterative stack version) to carve a perfect
+ * maze on a grid, then converts the grid wall structure into visual wall
+ * rectangles matching the original look.
+ */
+function generateMaze(gridSize) {
   const cellSize = MAZE_SIZE / gridSize;
-  const walls = [];
+  const cols = gridSize;
+  const rows = gridSize;
 
-  // Border walls with gaps at start (top-left) and end (bottom-right)
-  const gapSize = cellSize * 1.2;
+  // Each cell tracks which walls are present (true = wall exists)
+  const grid = Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => ({
+      top: true,
+      right: true,
+      bottom: true,
+      left: true,
+      visited: false,
+    }))
+  );
 
-  // Top border — gap at left for start
-  walls.push({ x: gapSize, y: 0, w: MAZE_SIZE - gapSize, h: WALL_THICKNESS });
-  // Bottom border — gap at right for end
-  walls.push({ x: 0, y: MAZE_SIZE - WALL_THICKNESS, w: MAZE_SIZE - gapSize, h: WALL_THICKNESS });
-  // Left border — gap at top for start
-  walls.push({ x: 0, y: gapSize, w: WALL_THICKNESS, h: MAZE_SIZE - gapSize });
-  // Right border — gap at bottom for end
-  walls.push({ x: MAZE_SIZE - WALL_THICKNESS, y: 0, w: WALL_THICKNESS, h: MAZE_SIZE - gapSize });
+  const directions = [
+    { dr: -1, dc: 0, wall: 'top', opposite: 'bottom' },
+    { dr: 0, dc: 1, wall: 'right', opposite: 'left' },
+    { dr: 1, dc: 0, wall: 'bottom', opposite: 'top' },
+    { dr: 0, dc: -1, wall: 'left', opposite: 'right' },
+  ];
 
-  // Safe zones: no walls near start or end
-  const safeRadius = cellSize * 1.5;
-  const startCenter = { x: cellSize * 0.8, y: cellSize * 0.8 };
-  const endCenter = { x: MAZE_SIZE - cellSize * 0.8, y: MAZE_SIZE - cellSize * 0.8 };
-
-  const isInSafeZone = (wx, wy, ww, wh) => {
-    // Check if wall rect overlaps with safe circles
-    const wallCx = wx + ww / 2;
-    const wallCy = wy + wh / 2;
-    const distStart = Math.sqrt((wallCx - startCenter.x) ** 2 + (wallCy - startCenter.y) ** 2);
-    const distEnd = Math.sqrt((wallCx - endCenter.x) ** 2 + (wallCy - endCenter.y) ** 2);
-    return distStart < safeRadius || distEnd < safeRadius;
+  // Shuffle helper
+  const shuffle = (arr) => {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
   };
 
-  // Internal walls — avoid start/end zones
-  const usedPositions = new Set();
-  let attempts = 0;
-  let placed = 0;
+  // Iterative backtracking to carve perfect maze
+  const stack = [];
+  grid[0][0].visited = true;
+  stack.push({ r: 0, c: 0 });
 
-  while (placed < wallCount && attempts < wallCount * 5) {
-    attempts++;
-    const isHorizontal = Math.random() > 0.5;
-    const gx = Math.floor(Math.random() * (gridSize - 2)) + 1;
-    const gy = Math.floor(Math.random() * (gridSize - 2)) + 1;
-    const key = `${gx}-${gy}-${isHorizontal}`;
-    if (usedPositions.has(key)) continue;
+  while (stack.length > 0) {
+    const { r, c } = stack[stack.length - 1];
+    const neighbors = shuffle([...directions]).filter(({ dr, dc }) => {
+      const nr = r + dr;
+      const nc = c + dc;
+      return nr >= 0 && nr < rows && nc >= 0 && nc < cols && !grid[nr][nc].visited;
+    });
 
-    let wx, wy, ww, wh;
-    if (isHorizontal) {
-      ww = cellSize * (1 + Math.floor(Math.random() * 1.5));
-      wh = WALL_THICKNESS;
-      wx = gx * cellSize;
-      wy = gy * cellSize;
+    if (neighbors.length === 0) {
+      stack.pop();
     } else {
-      ww = WALL_THICKNESS;
-      wh = cellSize * (1 + Math.floor(Math.random() * 1.5));
-      wx = gx * cellSize;
-      wy = gy * cellSize;
+      const { dr, dc, wall, opposite } = neighbors[0];
+      const nr = r + dr;
+      const nc = c + dc;
+      grid[r][c][wall] = false;
+      grid[nr][nc][opposite] = false;
+      grid[nr][nc].visited = true;
+      stack.push({ r: nr, c: nc });
     }
+  }
 
-    // Keep walls inside maze
-    if (wx + ww > MAZE_SIZE - WALL_THICKNESS) ww = MAZE_SIZE - WALL_THICKNESS - wx;
-    if (wy + wh > MAZE_SIZE - WALL_THICKNESS) wh = MAZE_SIZE - WALL_THICKNESS - wy;
-    if (wx < WALL_THICKNESS) { ww -= (WALL_THICKNESS - wx); wx = WALL_THICKNESS; }
-    if (wy < WALL_THICKNESS) { wh -= (WALL_THICKNESS - wy); wy = WALL_THICKNESS; }
+  // Open entrance (top of top-left cell) and exit (bottom of bottom-right cell)
+  grid[0][0].top = false;
+  grid[rows - 1][cols - 1].bottom = false;
 
-    if (ww <= 0 || wh <= 0) continue;
-    if (isInSafeZone(wx, wy, ww, wh)) continue;
+  // --- Convert grid walls into visual wall rectangles ---
+  const walls = [];
 
-    usedPositions.add(key);
-    walls.push({ x: wx, y: wy, w: ww, h: wh });
-    placed++;
+  // Outer border with entrance/exit gaps (same as original)
+  const gapSize = cellSize * 1.2;
+  walls.push({ x: gapSize, y: 0, w: MAZE_SIZE - gapSize, h: WALL_THICKNESS });
+  walls.push({ x: 0, y: MAZE_SIZE - WALL_THICKNESS, w: MAZE_SIZE - gapSize, h: WALL_THICKNESS });
+  walls.push({ x: 0, y: gapSize, w: WALL_THICKNESS, h: MAZE_SIZE - gapSize });
+  walls.push({ x: MAZE_SIZE - WALL_THICKNESS, y: 0, w: WALL_THICKNESS, h: MAZE_SIZE - gapSize });
+
+  // Internal horizontal walls (bottom edge of each cell, except last row)
+  for (let r = 0; r < rows - 1; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c].bottom) {
+        const wx = c * cellSize;
+        const wy = (r + 1) * cellSize - WALL_THICKNESS / 2;
+        walls.push({ x: wx, y: wy, w: cellSize, h: WALL_THICKNESS });
+      }
+    }
+  }
+
+  // Internal vertical walls (right edge of each cell, except last column)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      if (grid[r][c].right) {
+        const wx = (c + 1) * cellSize - WALL_THICKNESS / 2;
+        const wy = r * cellSize;
+        walls.push({ x: wx, y: wy, w: WALL_THICKNESS, h: cellSize });
+      }
+    }
   }
 
   return walls;
@@ -96,8 +127,8 @@ export default function FingerMaze({ difficulty, onCorrect, onWrong, onLockSwipe
   const [round, setRound] = useState(0);
 
   // Start/end positions away from corners, inside safe zone
-  const sp = { x: cellSize * 0.8, y: cellSize * 0.8 };
-  const ep = { x: MAZE_SIZE - cellSize * 0.8, y: MAZE_SIZE - cellSize * 0.8 };
+  const sp = { x: cellSize * 0.5, y: cellSize * 0.5 };
+  const ep = { x: MAZE_SIZE - cellSize * 0.5, y: MAZE_SIZE - cellSize * 0.5 };
 
   const playerX = useSharedValue(sp.x);
   const playerY = useSharedValue(sp.y);
@@ -109,7 +140,7 @@ export default function FingerMaze({ difficulty, onCorrect, onWrong, onLockSwipe
   const layoutRef = useRef({ x: 0, y: 0 });
 
   const initMaze = useCallback(() => {
-    const newWalls = generateMaze(config.gridSize, config.wallCount);
+    const newWalls = generateMaze(config.gridSize);
     wallsRef.current = newWalls;
     setWalls(newWalls);
     playerX.value = sp.x;

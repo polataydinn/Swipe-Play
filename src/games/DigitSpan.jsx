@@ -20,33 +20,48 @@ export default function DigitSpan({ difficulty, onCorrect, onWrong }) {
   const [sequence, setSequence] = useState([]);
   const [phase, setPhase] = useState('show');
   const [showIdx, setShowIdx] = useState(-1);
+  const [showingBlank, setShowingBlank] = useState(false);
   const [input, setInput] = useState([]);
+  const timersRef = useRef([]);
+
+  const clearTimers = () => {
+    timersRef.current.forEach(t => clearTimeout(t));
+    timersRef.current = [];
+  };
 
   const newRound = () => {
-    setSequence(generateSequence(config.length));
+    clearTimers();
+    const seq = generateSequence(config.length);
+    setSequence(seq);
     setInput([]);
     setPhase('show');
     setShowIdx(-1);
+    setShowingBlank(false);
+
+    const blankTime = 200;
+    let delay = config.showSpeed;
+
+    seq.forEach((_, i) => {
+      timersRef.current.push(setTimeout(() => {
+        setShowingBlank(false);
+        setShowIdx(i);
+      }, delay));
+      delay += config.showSpeed;
+      timersRef.current.push(setTimeout(() => {
+        setShowingBlank(true);
+        setShowIdx(-1);
+      }, delay));
+      delay += blankTime;
+    });
+
+    timersRef.current.push(setTimeout(() => {
+      setShowIdx(-1);
+      setShowingBlank(false);
+      setPhase('input');
+    }, delay));
   };
 
-  useEffect(() => { newRound(); }, [difficulty]);
-
-  useEffect(() => {
-    if (phase === 'show') {
-      let idx = 0;
-      setShowIdx(0);
-      const interval = setInterval(() => {
-        idx++;
-        if (idx >= sequence.length) {
-          clearInterval(interval);
-          setTimeout(() => { setShowIdx(-1); setPhase('input'); }, config.showSpeed);
-        } else {
-          setShowIdx(idx);
-        }
-      }, config.showSpeed);
-      return () => clearInterval(interval);
-    }
-  }, [phase, sequence.length, config.showSpeed]);
+  useEffect(() => { newRound(); return () => clearTimers(); }, [difficulty]);
 
   const handleDigit = (d) => {
     playTap();
@@ -61,10 +76,13 @@ export default function DigitSpan({ difficulty, onCorrect, onWrong }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.instruction}>{phase === 'show' ? 'İzle ve ezberle!' : 'Sırayla gir'}</Text>
+      <Text style={styles.instruction}>{phase === 'show' ? 'Izle ve ezberle!' : 'Sirayla gir'}</Text>
       <View style={styles.display}>
-        {phase === 'show' && showIdx >= 0 && (
+        {phase === 'show' && showIdx >= 0 && !showingBlank && (
           <Text style={styles.bigDigit}>{sequence[showIdx]}</Text>
+        )}
+        {phase === 'show' && (showIdx < 0 || showingBlank) && (
+          <View style={styles.blankBox} />
         )}
         {phase === 'input' && (
           <View style={styles.inputRow}>
@@ -85,7 +103,7 @@ export default function DigitSpan({ difficulty, onCorrect, onWrong }) {
           ))}
         </View>
       )}
-      {phase === 'show' && (
+      {phase === 'show' && showIdx >= 0 && (
         <Text style={styles.counter}>{showIdx + 1} / {sequence.length}</Text>
       )}
     </View>
@@ -97,6 +115,7 @@ const styles = StyleSheet.create({
   instruction: { color: COLORS.textSecondary, fontSize: 18, marginBottom: 24 },
   display: { height: 100, justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
   bigDigit: { color: COLORS.text, fontSize: 72, fontWeight: '800' },
+  blankBox: { width: 80, height: 80, borderRadius: 16, backgroundColor: COLORS.surface },
   inputRow: { flexDirection: 'row', gap: 8 },
   slot: { width: 40, height: 48, backgroundColor: COLORS.surface, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.surfaceLight },
   slotFilled: { borderColor: '#22c55e' },
