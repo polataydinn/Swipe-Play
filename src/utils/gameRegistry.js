@@ -42,8 +42,13 @@ import FishingNet from '../games/FishingNet';
 import GoldMiner from '../games/GoldMiner';
 import DinosaurGame from '../games/DinosaurGame';
 import BallDodge from '../games/BallDodge';
-import BikeJump from '../games/BikeJump';
 import PacmanGame from '../games/PacmanGame';
+import WipeGlassGame from '../games/WipeGlassGame';
+import SpaceShooterGame from '../games/SpaceShooterGame';
+import ScaldfishGame from '../games/ScaldfishGame';
+import PetPartyGame from '../games/PetPartyGame';
+import QuickRushGame from '../games/QuickRushGame';
+import JumpOneGame from '../games/JumpOneGame';
 
 export const GAME_COMPONENTS = {
   'color-memory': ColorMemory,
@@ -90,6 +95,11 @@ export const GAME_COMPONENTS = {
   'gold-miner': GoldMiner,
   'dinosaur-game': DinosaurGame,
   'ball-dodge': BallDodge,
-  'bike-jump': BikeJump,
   'pacman-game': PacmanGame,
+  'wipe-glass': WipeGlassGame,
+  'space-shooter': SpaceShooterGame,
+  'scaldfish': ScaldfishGame,
+  'pet-party': PetPartyGame,
+  'quick-rush': QuickRushGame,
+  'jump-one': JumpOneGame,
 };

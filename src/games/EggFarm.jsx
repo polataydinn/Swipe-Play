@@ -18,7 +18,7 @@ const UPGRADES = {
 };
 
 const GOLDEN_BASE_COST = 400;
-const MAX_VISIBLE_EGGS = 30;
+const MAX_RENDERED_EGGS = 30;  // max Animated views to prevent crash
 const POLL_MS = 150;
 
 let _id = 0;
@@ -30,7 +30,8 @@ export default function EggFarm({ difficulty, onCorrect, onWrong, onLockSwipe, o
   const [phase, setPhase] = useState('ready');
   const [money, setMoney] = useState(0);
   const [totalEarned, setTotalEarned] = useState(0);
-  const [eggs, setEggs] = useState([]);
+  const [eggs, setEggs] = useState([]);          // rendered Animated views (max MAX_RENDERED_EGGS)
+  const [eggCount, setEggCount] = useState(0);   // real total egg count (unlimited)
   const [chickens, setChickens] = useState(1);
   const [speedLvl, setSpeedLvl] = useState(0);
   const [valueLvl, setValueLvl] = useState(0);
@@ -38,7 +39,7 @@ export default function EggFarm({ difficulty, onCorrect, onWrong, onLockSwipe, o
   const [sellFlash, setSellFlash] = useState(false);
 
   const stRef = useRef({
-    money: 0, totalEarned: 0, eggs: [],
+    money: 0, totalEarned: 0, eggs: [], eggCount: 0,
     chickens: 1, speedLvl: 0, valueLvl: 0, golden: false, phase: 'ready',
   });
   const chickenTimersRef = useRef([]); // last spawn time per chicken
@@ -66,16 +67,29 @@ export default function EggFarm({ difficulty, onCorrect, onWrong, onLockSwipe, o
 
   const spawnEgg = useCallback(() => {
     if (!mountedRef.current) return;
-    setEggs(prev => {
-      if (prev.length >= MAX_VISIBLE_EGGS) return prev;
+    const s = stRef.current;
+
+    // Always increment real count
+    s.eggCount += 1;
+    setEggCount(s.eggCount);
+
+    // Only add a rendered egg if under the cap
+    if (s.eggs.length < MAX_RENDERED_EGGS) {
       const x = 12 + Math.random() * (SW - 88);
       const y = Math.random() * 80;
       const anim = new Animated.Value(0);
       Animated.spring(anim, { toValue: 1, useNativeDriver: true, tension: 70, friction: 7 }).start();
-      const newEgg = { id: uid(), x, y, anim, golden: stRef.current.golden };
-      stRef.current.eggs = [...prev, newEgg];
-      return [...prev, newEgg];
-    });
+      const newEgg = { id: uid(), x, y, anim, golden: s.golden };
+      s.eggs = [...s.eggs, newEgg];
+      setEggs([...s.eggs]);
+    } else {
+      // Cap reached — animate a random existing egg as a "bump" so the user feels the new one
+      const target = s.eggs[Math.floor(Math.random() * s.eggs.length)];
+      if (target) {
+        target.anim.setValue(0.7);
+        Animated.spring(target.anim, { toValue: 1, useNativeDriver: true, tension: 120, friction: 6 }).start();
+      }
+    }
   }, []);
 
   const startLoop = useCallback((spawnMs, chickenCount) => {
@@ -119,10 +133,10 @@ export default function EggFarm({ difficulty, onCorrect, onWrong, onLockSwipe, o
     if (onLockSwipe) onLockSwipe();
     clearInterval(loopRef.current);
     stRef.current = {
-      money: 0, totalEarned: 0, eggs: [],
+      money: 0, totalEarned: 0, eggs: [], eggCount: 0,
       chickens: 1, speedLvl: 0, valueLvl: 0, golden: false, phase: 'play',
     };
-    setMoney(0); setTotalEarned(0); setEggs([]); setChickens(1);
+    setMoney(0); setTotalEarned(0); setEggs([]); setEggCount(0); setChickens(1);
     setSpeedLvl(0); setValueLvl(0); setGoldenUnlocked(false); setSellFlash(false);
     setPhase('play');
     const ms = cfg.baseSpawnMs;
@@ -131,16 +145,18 @@ export default function EggFarm({ difficulty, onCorrect, onWrong, onLockSwipe, o
   };
 
   const sellAll = () => {
-    const count = stRef.current.eggs.length;
+    const count = stRef.current.eggCount;
     if (count === 0) return;
     playCorrect();
     const earned = count * getEggValue();
     stRef.current.money += earned;
     stRef.current.totalEarned += earned;
     stRef.current.eggs = [];
+    stRef.current.eggCount = 0;
     setMoney(stRef.current.money);
     setTotalEarned(stRef.current.totalEarned);
     setEggs([]);
+    setEggCount(0);
     setSellFlash(true);
     setTimeout(() => setSellFlash(false), 300);
   };
@@ -151,9 +167,11 @@ export default function EggFarm({ difficulty, onCorrect, onWrong, onLockSwipe, o
     stRef.current.money += val;
     stRef.current.totalEarned += val;
     stRef.current.eggs = stRef.current.eggs.filter(e => e.id !== id);
+    stRef.current.eggCount = Math.max(0, stRef.current.eggCount - 1);
     setMoney(stRef.current.money);
     setTotalEarned(stRef.current.totalEarned);
-    setEggs(prev => prev.filter(e => e.id !== id));
+    setEggs([...stRef.current.eggs]);
+    setEggCount(stRef.current.eggCount);
   };
 
   const buyChicken = () => {
@@ -257,7 +275,7 @@ export default function EggFarm({ difficulty, onCorrect, onWrong, onLockSwipe, o
             </View>
             <View style={styles.hudChip}>
               <Text style={styles.hudLabel}>🥚</Text>
-              <Text style={styles.hudVal}>{eggs.length}</Text>
+              <Text style={styles.hudVal}>{eggCount}</Text>
             </View>
             <TouchableOpacity style={styles.stopBtn} onPress={stopGame}>
               <Text style={styles.stopTxt}>■ DUR</Text>
@@ -270,7 +288,7 @@ export default function EggFarm({ difficulty, onCorrect, onWrong, onLockSwipe, o
             <View style={styles.chickenRow}>
               {Array.from({ length: Math.min(chickens, 10) }).map((_, i) => (
                 <Text key={i} style={styles.chickenEmoji}>
-                  {goldenUnlocked ? '✨' : '🐔'}
+                  {goldenUnlocked && i === 0 ? '🌟' : '🐔'}
                 </Text>
               ))}
               {chickens > 10 && (
@@ -294,7 +312,7 @@ export default function EggFarm({ difficulty, onCorrect, onWrong, onLockSwipe, o
                 ]}
               >
                 <TouchableOpacity onPress={() => tapEgg(egg.id)} style={styles.eggBtn}>
-                  <Text style={styles.eggEmoji}>{egg.golden ? '✨' : '🥚'}</Text>
+                  <View style={[styles.eggShape, egg.golden && styles.eggShapeGolden]} />
                   <Text style={styles.eggVal}>+{getEggValue()}</Text>
                 </TouchableOpacity>
               </Animated.View>
@@ -307,7 +325,7 @@ export default function EggFarm({ difficulty, onCorrect, onWrong, onLockSwipe, o
             onPress={sellAll}
             activeOpacity={0.7}
           >
-            <Text style={styles.sellTxt}>HEPSİNİ SAT  💰 +{eggs.length * getEggValue()}</Text>
+            <Text style={styles.sellTxt}>HEPSİNİ SAT  💰 +{eggCount * getEggValue()}</Text>
           </TouchableOpacity>
 
           {/* Upgrades */}
@@ -397,8 +415,29 @@ const styles = StyleSheet.create({
 
   eggWrapper: { position: 'absolute', alignItems: 'center' },
   eggBtn: { alignItems: 'center', padding: 4 },
-  eggEmoji: { fontSize: 30 },
-  eggVal: { color: '#fbbf24', fontSize: 10, fontWeight: '700', marginTop: -2 },
+  eggShape: {
+    width: 26,
+    height: 32,
+    borderRadius: 13,
+    backgroundColor: '#f5f0e8',
+    borderTopLeftRadius: 13,
+    borderTopRightRadius: 13,
+    borderBottomLeftRadius: 11,
+    borderBottomRightRadius: 11,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  eggShapeGolden: {
+    backgroundColor: '#f59e0b',
+    shadowColor: '#f59e0b',
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  eggVal: { color: '#fbbf24', fontSize: 10, fontWeight: '700', marginTop: 2 },
 
   sellBtn: {
     marginHorizontal: 16, marginVertical: 8,

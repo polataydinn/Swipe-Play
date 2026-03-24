@@ -1,4 +1,15 @@
 export const GAME_DESCRIPTIONS = [
+  // --- En Son Eklenenler (en üstte) ---
+  { id: 'jump-one', title: 'Jump One', shortDesc: 'Bas, güç biriktir, platforma zıpla!', fullDesc: 'Parmağını basılı tut ve gücü biriktir, bırakınca zıpla! Tam ortaya düşersen bonus puan. 3 canın var, nişangahın seni yönlendirir.', accent: '#6c5ce7', singleLevel: true },
+  { id: 'quick-rush', title: 'Hızlı Koşu', shortDesc: 'Platformlarda koş, ne kadar gidebilirsin?', fullDesc: 'Platformdan platforma zıpla! Sikkeleri topla, engellerden kaç. Gittikçe hızlanır — ne kadar ileri gidebilirsin?', accent: '#6c5ce7', singleLevel: true },
+  { id: 'pet-party', title: 'Pet Party', shortDesc: '6 sevimli evcil hayvan, 15 bölüm!', fullDesc: 'Aynı evcil hayvanları üç ya da daha fazla yan yana getir, patlat ve hedef puanı yakala. İlerleme kaydedilir, kaldığın yerden devam et!', accent: '#6366f1', singleLevel: true },
+  { id: 'scaldfish', title: 'Fener İstifi', shortDesc: 'Fenerleri üst üste istifle!', fullDesc: 'Sallanan fenere tam zamanında dokun ve düşür! Her fener öncekinden dar olmalı, yoksa devrilir. 5/8/12 fener istifle!', accent: '#c0392b', singleLevel: false },
+{ id: 'space-shooter', title: 'Uzay Savaşçısı', shortDesc: 'Gemiyi sürükle, düşmanları vur!', fullDesc: 'Parmağını sürükleyerek uzay gemini kontrol et. Gemi otomatik ateş eder. 20 düşmanı yok et ve kazan!', accent: '#6c5ce7', singleLevel: true },
+  { id: 'wipe-glass', title: 'Camı Sil', shortDesc: 'Parmağınla kirli camı sil!', fullDesc: 'Parmağını sürükleyerek kirli camı temizle. 20 saniyede %100 temizle ve kazan!', accent: '#38bdf8', singleLevel: true },
+  { id: 'pacman-game', title: 'Pac-Man', shortDesc: 'Noktaları ye, hayaletlerden kaç!', fullDesc: 'Labirenti gezerek tüm noktaları ye. Güç hapı yutunca hayaletleri yiyebilirsin!', accent: '#f7e030', singleLevel: true },
+{ id: 'ball-dodge', title: 'Top Kaçış', shortDesc: 'Düşen toplardan kaçın!', fullDesc: 'Sağa sola hareket ederek yukarıdan düşen toplardan kaçın. Hayatta kaldıkça puan kazan!', accent: '#f97316', singleLevel: true },
+  { id: 'dinosaur-game', title: 'Fufu Koşusu', shortDesc: 'Engelleri atla, meyve topla!', fullDesc: 'Fufu karakteriyle koş! Dokunarak zıpla (çift zıplama var), taş/kasadan kaç, meyveleri topla.', accent: '#f97316' },
+
   // --- Hafıza ---
   { id: 'color-memory', title: 'Renk Hafiza', shortDesc: 'Renk sirasini ezberle ve tekrarla.', fullDesc: 'Ekranda bir dizi renk belirecek. Sirayi dikkatlice izle ve ayni sirayla tekrarla.', accent: '#e74c3c' },
   { id: 'memory-match', title: 'Hafiza Eslestirme', shortDesc: 'Emoji ciftlerini bul ve eslestir.', fullDesc: 'Kartlari cevirerek ayni emoji ciftlerini bul.', accent: '#e67e22' },
@@ -45,7 +56,7 @@ export const GAME_DESCRIPTIONS = [
   { id: 'finger-maze', title: 'Parmak Labirent', shortDesc: 'Duvarlara dokunmadan cikisi bul.', fullDesc: 'Parmagini baslangictan bitise surukle. Duvarlara dokunma!', accent: '#00bcd4' },
 
   // --- Arcade ---
-  { id: 'game-2048', title: '2048', shortDesc: 'Kaydirarak sayilari birlestir.', fullDesc: 'Ayni sayili karolari birlestirerek hedefe ulas! Klasik 2048 bulmacasi.', accent: '#edc22e', singleLevel: true },
+  { id: 'game-2048', title: '2048', shortDesc: 'Kaydır, birleştir, 2048\'e ulaş!', fullDesc: 'Aynı sayıları birleştirerek 2048\'e ulaş! Klasik bulmaca oyunu.', accent: '#edc22e', singleLevel: true },
   { id: 'flappy-dot', title: 'Flappy Dot', shortDesc: 'Dokunarak engelleri as.', fullDesc: 'Noktayi ucur ve yesil borularin arasindan gecir!', accent: '#facc15', singleLevel: true },
   { id: 'brick-breaker', title: 'Tugla Kir', shortDesc: 'Topla tuglalari kir.', fullDesc: 'Paddle\'i kaydirarak topu sektir ve tum tuglalari kir! ★ yakala = 2. top!', accent: '#3b82f6' },
   { id: 'pong-lite', title: 'Pong', shortDesc: 'Klasik Pong, AI\'ya karsi oyna.', fullDesc: 'Paddle\'ini kaydirarak topu karsi tarafa gonder!', accent: '#22c55e' },
@@ -66,9 +77,4 @@ export const GAME_DESCRIPTIONS = [
   { id: 'flappy-first', title: '3D Flappy', shortDesc: 'İlk şahıs Flappy Bird!', fullDesc: 'Tünelin içinden uç! 3D perspektiften borulardan geç, dokunarak yukarı çık.', accent: '#facc15', singleLevel: true },
   { id: 'fishing-net', title: 'Ağ Balıkçılık', shortDesc: 'Ağ çizerek balık yakala.', fullDesc: 'Parmağını hızlıca kaydırarak balıkların üzerinden geç ve ağa takılmalarını sağla!', accent: '#38bdf8', singleLevel: true },
   { id: 'gold-miner', title: 'Altın Madenci', shortDesc: 'Kancayı fırlat, madenleri topla.', fullDesc: 'Salınan kancayı doğru anda fırlat! Altın ve elmas yakala, kayadan kaçın.', accent: '#f59e0b' },
-  { id: 'dinosaur-game', title: 'Fufu Koşusu', shortDesc: 'Engelleri atla, meyve topla!', fullDesc: 'Fufu karakteriyle koş! Dokunarak zıpla (çift zıplama var), taş/kasadan kaç, meyveleri topla.', accent: '#f97316' },
-
-  { id: 'ball-dodge', title: 'Top Kaçış', shortDesc: 'Düşen toplardan kaçın!', fullDesc: 'Sağa sola hareket ederek yukarıdan düşen toplardan kaçın. Hayatta kaldıkça puan kazan!', accent: '#f97316', singleLevel: true },
-  { id: 'bike-jump', title: 'Bisikletçi', shortDesc: 'Engelleri atlayarak ilerle!', fullDesc: 'Dokunarak zıpla, çift zıplama yaparak engelleri ve uçan kuşları aş!', accent: '#22c55e', singleLevel: true },
-  { id: 'pacman-game', title: 'Pac-Man', shortDesc: 'Noktaları ye, hayaletlerden kaç!', fullDesc: 'Labirenti gezerek tüm noktaları ye. Güç hapı yutunca hayaletleri yiyebilirsin!', accent: '#f7e030', singleLevel: true },
 ];

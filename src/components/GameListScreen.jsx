@@ -147,8 +147,9 @@ const GAME_ICONS = {
   'gold-miner': '⛏️',
   'dinosaur-game': '🦕',
   'ball-dodge': '💨',
-  'bike-jump': '🚴',
   'pacman-game': '👻',
+  'space-shooter': '🚀',
+  'wipe-glass': '🪟',
 };
 
 export default function GameListScreen({ onSelectGame }) {

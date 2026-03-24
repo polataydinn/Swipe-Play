@@ -70,7 +70,7 @@ MAP.forEach((t, idx) => {
 const PAC_SPD    = 90;   // px/sec (original coords)
 const GHOST_SPD  = 68;
 const FRIGHT_SPD = 42;
-const THRESHOLD  = 4;    // px tolerance to cell center for turning
+const THRESHOLD  = 8;    // px tolerance to cell center for turning
 
 const DIR_VEC = { left:[-1,0], right:[1,0], up:[0,-1], down:[0,1] };
 const OPPOSITE = { left:'right', right:'left', up:'down', down:'up' };
@@ -148,7 +148,7 @@ export default function PacmanGame({ difficulty, onCorrect, onWrong, onLockSwipe
     frightUntil: 0,
     ghosts: GHOST_DEFS.map(g => {
       const [cx, cy] = cellCenter(g.col, g.row);
-      return { ...g, x: cx, y: cy, vx: g.dir === 'right' ? 1 : -1, vy: 0 };
+      return { ...g, x: cx, y: cy, vx: g.dir === 'right' ? 1 : -1, vy: 0, wasNearCenter: true };
     }),
   });
 
@@ -210,22 +210,16 @@ export default function PacmanGame({ difficulty, onCorrect, onWrong, onLockSwipe
     // ── Move Pac-Man ────────────────────────────────────────────────────────────
     const pSpd = PAC_SPD;
 
-    // Try to apply desired direction at grid center
     const pCol = Math.floor(s.pacX / TILE);
     const pRow = Math.floor(s.pacY / TILE);
     const [pcx, pcy] = cellCenter(pCol, pRow);
 
-    const wantDir = s.pacWant;
-    const curDir  = s.pacDir;
-    if (wantDir && wantDir !== curDir) {
-      const wv = DIR_VEC[wantDir];
-      const cv = DIR_VEC[curDir];
-      const sameAxis = (wv[0] !== 0) === (cv[0] !== 0); // same horizontal/vertical
-      if (sameAxis) {
-        // 180° turn: always allow
-        if (wantDir === OPPOSITE[curDir]) {
-          s.pacDir = wantDir; s.pacVx = wv[0]; s.pacVy = wv[1];
-        }
+    // Try to apply desired direction change
+    if (s.pacWant && s.pacWant !== s.pacDir) {
+      const wv = DIR_VEC[s.pacWant];
+      if (s.pacWant === OPPOSITE[s.pacDir]) {
+        // 180° turn: always allow immediately
+        s.pacDir = s.pacWant; s.pacVx = wv[0]; s.pacVy = wv[1];
       } else {
         // Perpendicular: need to be near cell center on the movement axis
         const nearCenter = s.pacVx !== 0
@@ -233,22 +227,30 @@ export default function PacmanGame({ difficulty, onCorrect, onWrong, onLockSwipe
           : Math.abs(s.pacX - pcx) < THRESHOLD;
         if (nearCenter && isSafe(pCol + wv[0], pRow + wv[1])) {
           if (s.pacVx !== 0) s.pacY = pcy; else s.pacX = pcx;
-          s.pacDir = wantDir; s.pacVx = wv[0]; s.pacVy = wv[1];
+          s.pacDir = s.pacWant; s.pacVx = wv[0]; s.pacVy = wv[1];
         }
       }
     }
 
-    // Move
-    const nx = s.pacX + s.pacVx * pSpd * dt;
-    const ny = s.pacY + s.pacVy * pSpd * dt;
+    // If stopped, only restart if the blocked direction is now clear (prevents wall-glitch oscillation)
+    if (s.pacVx === 0 && s.pacVy === 0) {
+      const dv = DIR_VEC[s.pacDir];
+      if (isSafe(pCol + dv[0], pRow + dv[1])) {
+        s.pacVx = dv[0]; s.pacVy = dv[1];
+      }
+    }
 
-    // Wall collision
-    const ncol = Math.floor(nx / TILE), nrow = Math.floor(ny / TILE);
-    if (isSafe(ncol, nrow)) { s.pacX = nx; s.pacY = ny; }
-    else {
-      // Snap to cell center to prevent getting stuck
-      s.pacX = pcx; s.pacY = pcy;
-      s.pacVx = 0;  s.pacVy = 0;
+    // Move only if we have velocity
+    if (s.pacVx !== 0 || s.pacVy !== 0) {
+      const nx = s.pacX + s.pacVx * pSpd * dt;
+      const ny = s.pacY + s.pacVy * pSpd * dt;
+      const ncol = Math.floor(nx / TILE), nrow = Math.floor(ny / TILE);
+      if (isSafe(ncol, nrow)) { s.pacX = nx; s.pacY = ny; }
+      else {
+        // Hit wall — snap to center and stop; next frame check will decide if can move
+        s.pacX = pcx; s.pacY = pcy;
+        s.pacVx = 0;  s.pacVy = 0;
+      }
     }
 
     // Tunnel wrap
@@ -292,10 +294,13 @@ export default function PacmanGame({ difficulty, onCorrect, onWrong, onLockSwipe
       const nearCenterX = Math.abs(g.x - gcx) < THRESHOLD;
       const nearCenterY = Math.abs(g.y - gcy) < THRESHOLD;
 
-      if (nearCenterX && nearCenterY) {
+      // Only repick direction when ARRIVING at a new cell center (not every frame while near center)
+      const isStuck = g.vx === 0 && g.vy === 0;
+      if (nearCenterX && nearCenterY && (!g.wasNearCenter || isStuck)) {
         // Pick direction at intersection
+        // If stuck (hit a wall), allow ALL directions including reverse
         const possible = ['left','right','up','down'].filter(d => {
-          if (d === OPPOSITE[g.dir]) return false; // no reverse
+          if (!isStuck && d === OPPOSITE[g.dir]) return false; // no reverse unless stuck
           const [dvx, dvy] = DIR_VEC[d];
           return isSafe(gCol + dvx, gRow + dvy, true);
         });
@@ -324,12 +329,17 @@ export default function PacmanGame({ difficulty, onCorrect, onWrong, onLockSwipe
           g.x = gcx; g.y = gcy;
         }
       }
+      g.wasNearCenter = nearCenterX && nearCenterY;
 
       const gnx = g.x + g.vx * gSpd * dt;
       const gny = g.y + g.vy * gSpd * dt;
       const gncol = Math.floor(gnx / TILE), gnrow = Math.floor(gny / TILE);
       if (isSafe(gncol, gnrow, true)) { g.x = gnx; g.y = gny; }
-      else { g.x = gcx; g.y = gcy; g.vx = 0; g.vy = 0; }
+      else {
+        // Blocked by wall — snap to center, reset wasNearCenter to force direction repick
+        g.x = gcx; g.y = gcy; g.vx = 0; g.vy = 0;
+        g.wasNearCenter = false;
+      }
 
       // Tunnel wrap
       if (g.x < 0)          g.x = MW * TILE - 1;
@@ -393,7 +403,13 @@ export default function PacmanGame({ difficulty, onCorrect, onWrong, onLockSwipe
     <View style={styles.root}>
       {/* Score & Lives */}
       <View style={styles.hud}>
-        <Text style={styles.hudTxt}>⬛ {state.lives || 3}</Text>
+        <View style={styles.heartsRow}>
+          {[1,2,3].map(i => (
+            <Text key={i} style={styles.heartTxt}>
+              {i <= (state.lives ?? 3) ? '❤️' : '🖤'}
+            </Text>
+          ))}
+        </View>
         <Text style={styles.hudTxt}>SCORE: {state.score || 0}</Text>
       </View>
 
@@ -480,19 +496,19 @@ export default function PacmanGame({ difficulty, onCorrect, onWrong, onLockSwipe
 
       {/* D-Pad */}
       <View style={styles.dpad}>
-        <TouchableOpacity style={styles.dBtn} onPress={() => { setDir('up'); if(phase==='ready') startGame(); }} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.dBtn} onPressIn={() => { setDir('up'); if(phase==='ready') startGame(); }} activeOpacity={0.7}>
           <Text style={styles.dBtnTxt}>▲</Text>
         </TouchableOpacity>
         <View style={styles.dRow}>
-          <TouchableOpacity style={styles.dBtn} onPress={() => { setDir('left'); if(phase==='ready') startGame(); }} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.dBtn} onPressIn={() => { setDir('left'); if(phase==='ready') startGame(); }} activeOpacity={0.7}>
             <Text style={styles.dBtnTxt}>◀</Text>
           </TouchableOpacity>
           <View style={styles.dCenter} />
-          <TouchableOpacity style={styles.dBtn} onPress={() => { setDir('right'); if(phase==='ready') startGame(); }} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.dBtn} onPressIn={() => { setDir('right'); if(phase==='ready') startGame(); }} activeOpacity={0.7}>
             <Text style={styles.dBtnTxt}>▶</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.dBtn} onPress={() => { setDir('down'); if(phase==='ready') startGame(); }} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.dBtn} onPressIn={() => { setDir('down'); if(phase==='ready') startGame(); }} activeOpacity={0.7}>
           <Text style={styles.dBtnTxt}>▼</Text>
         </TouchableOpacity>
       </View>
@@ -554,16 +570,18 @@ function Overlay({ children }) {
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
-const DBTN = 48;
+const DBTN = 70;
 const styles = StyleSheet.create({
   root: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#000',
   },
   hud: {
-    flexDirection: 'row', justifyContent: 'space-between',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     width: GAME_W, paddingHorizontal: 8, paddingVertical: 4,
   },
+  heartsRow: { flexDirection: 'row', alignItems: 'center' },
+  heartTxt: { fontSize: 18, marginRight: 2 },
   hudTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
   arena: {
     backgroundColor: '#000',
@@ -572,18 +590,18 @@ const styles = StyleSheet.create({
   },
   dpad: {
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   dRow: { flexDirection: 'row', alignItems: 'center' },
   dCenter: { width: DBTN, height: DBTN, backgroundColor: '#111', borderRadius: DBTN/2 },
   dBtn: {
     width: DBTN, height: DBTN,
-    backgroundColor: '#222',
+    backgroundColor: '#333',
     borderRadius: DBTN / 2,
     justifyContent: 'center', alignItems: 'center',
-    margin: 4,
+    margin: 3,
   },
-  dBtnTxt: { color: '#f7e030', fontSize: 20, fontWeight: '900' },
+  dBtnTxt: { color: '#f7e030', fontSize: 26, fontWeight: '900' },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center', alignItems: 'center',

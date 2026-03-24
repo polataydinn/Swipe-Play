@@ -51,7 +51,6 @@ export default function PeriodicElement({ difficulty, onCorrect, onWrong }) {
       <Text style={styles.streak}>🔥 {streak}</Text>
       <Text style={styles.label}>Bu elementi tabloda bul:</Text>
       <Text style={styles.targetName}>{target.name}</Text>
-      <Text style={styles.targetNum}>Atom No: {target.number}</Text>
       <View style={styles.table}>
         {pool.map((el, i) => (
           <TouchableOpacity key={i} style={[styles.cell, { width: cellSize, height: cellSize, left: el.col * (cellSize + 2), top: el.row * (cellSize + 2), position: 'absolute', backgroundColor: ELEM_COLORS[el.row % ELEM_COLORS.length] + '30', borderColor: ELEM_COLORS[el.row % ELEM_COLORS.length] }]} onPress={() => handleTap(el)} activeOpacity={0.7}>
